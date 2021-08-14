@@ -142,8 +142,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Main.h" />
-    <ClInclude Include="Params.h" />
     <ClInclude Include="Simulation.h" />
+    <ClInclude Include="types.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
