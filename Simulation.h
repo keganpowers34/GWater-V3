@@ -29,12 +29,7 @@ public:
 	void pauseSimulation();
 	void stopSimulation();
 	void internalRun();
-
-	//sets radius of particle colliders
-	void setRadius(float r) {
-		radius = r;
-
-	};
+	void setRadius(float r);
 
 	Simulation() {
 		initParams();
