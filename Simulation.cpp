@@ -64,7 +64,7 @@ void Simulation::initParams() {
 
 };
 
-void internalRun(Simulation sim) {
+void internalRun(Simulation& sim) {
 
     NvFlexLibrary* library = NvFlexInit();
 
@@ -141,14 +141,13 @@ void internalRun(Simulation sim) {
     NvFlexShutdown(library);
 }
 
-void initSimulation(Simulation sim)
+void initSimulation(Simulation& sim)
 {
 	if (sim.isValid) {
 		return;
 	}
 
-	//broken as of now
-	std::thread simThread = std::thread(sim.internalRun());
+	std::thread simThread = std::thread(internalRun, std::ref(sim));
 	simThread.detach();
 
 	sim.isValid = true;
