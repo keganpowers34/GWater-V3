@@ -26,6 +26,7 @@ public:
 	int deltaTime2 = 16.6;
 	int* phases;
 	NvFlexParams g_params;
+	std::thread thread;
 	void initParams();
 	void startSimulation();
 	void pauseSimulation();

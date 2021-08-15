@@ -12,12 +12,10 @@ Vector makeVec(float x, float y, float z) {
     vec.z = z;
     return vec;
 }
+//potato forced me to add this
+#define ADD_GWATER_FUNC(funcName, tblName) LUA->PushCFunction(funcName); LUA->SetField(-2, tblName);
 
-LUA_FUNCTION(GWaterInitSim) {
-    initSimulation(sim);
-}
-
-LUA_FUNCTION(GWaterStartSim) {
+LUA_FUNCTION(GWaterUnpauseSim) {
     sim->isRunning = true;
     return 0;
 }
@@ -27,21 +25,11 @@ LUA_FUNCTION(GWaterPauseSim) {
     return 0;
 }
 
-LUA_FUNCTION(GWaterStopSim) {
+LUA_FUNCTION(GWaterDeleteSim) {
     if (!sim->isValid) return 0;
 
     sim->stopSimulation();
     return 0;
-}
-
-LUA_FUNCTION(GWaterIsRunning) {
-    LUA->PushBool(sim->isRunning);
-    return 1;
-}
-
-LUA_FUNCTION(GWaterIsValid) {
-    LUA->PushBool(sim->isValid);
-    return 1;
 }
 
 LUA_FUNCTION(GWaterParticleCount) {
@@ -76,57 +64,24 @@ LUA_FUNCTION(GWaterGetParticleData) {
     return returncount;
 }
 
+
+
 GMOD_MODULE_OPEN() {
 
+    initSimulation(sim);
 
     // push ALL c -> lua functions
     LUA->PushSpecial(SPECIAL_GLOB); //push _G
 
-    LUA->PushString("GWater_GetParticleData");
-    LUA->PushCFunction(GWaterGetParticleData);
-    LUA->SetTable(-3);
+    LUA->CreateTable();
 
-    // push particle data retriever
-    //LUA->PushString("GWater_SpawnParticle");
-    //LUA->PushCFunction(GWaterSpawnParticle);
-    //LUA->SetTable(-3);
+    ADD_GWATER_FUNC(GWaterUnpauseSim, "Unpause");
+    ADD_GWATER_FUNC(GWaterPauseSim, "Pause");
+    ADD_GWATER_FUNC(GWaterDeleteSim, "DeleteAll");
+    ADD_GWATER_FUNC(GWaterGetParticleData, "GetData");
 
-    // push simulation init
-    LUA->PushString("GWater_InitSimulation");
-    LUA->PushCFunction(GWaterInitSim);
-    LUA->SetTable(-3);
-
-    // push simulation starter
-    LUA->PushString("GWater_StartSimulation");
-    LUA->PushCFunction(GWaterStartSim);
-    LUA->SetTable(-3);
-
-    // push simulation pauser
-    LUA->PushString("GWater_PauseSimulation");
-    LUA->PushCFunction(GWaterPauseSim);
-    LUA->SetTable(-3);
-
-    // push simulation destroyer
-    LUA->PushString("GWater_StopSimulation");
-    LUA->PushCFunction(GWaterStopSim);
-    LUA->SetTable(-3);
-
-    // push simulation isrunning
-    LUA->PushString("GWater_IsRunning");
-    LUA->PushCFunction(GWaterIsRunning);
-    LUA->SetTable(-3);
-
-    // push simulation isvalid
-    LUA->PushString("GWater_IsValid");
-    LUA->PushCFunction(GWaterIsValid);
-    LUA->SetTable(-3);
-
-    // push simulation count retriever
-    LUA->PushString("GWater_ParticleCount");
-    LUA->PushCFunction(GWaterParticleCount);
-    LUA->SetTable(-3);
-
-    LUA->Pop(); //pop _G
+    LUA->SetField(-2, "gwater");
+    LUA->Pop(); // pop _G
 
 
     

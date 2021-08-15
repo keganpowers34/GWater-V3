@@ -177,14 +177,15 @@ void internalRun(Simulation* sim) {
     NvFlexShutdown(library);
 
 	bufferMutex->unlock();
+
 }
 
 void initSimulation(Simulation* sim)
 {
 	if (sim->isValid) return;
 
-	std::thread simThread = std::thread(internalRun, sim);
-	simThread.detach();
+	sim->thread = std::thread(internalRun, sim);
+	sim->thread.detach();
 
 	sim->isValid = true;
 }
