@@ -90,6 +90,12 @@ void internalRun(Simulation* sim) {
     phaseBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
     activeBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
 
+	//idk what tf this do
+	sim->particles = (float4*)malloc(sizeof(float4) * sim->maxParticles);
+	sim->velocities = (float3*)malloc(sizeof(float3) * sim->maxParticles);
+	sim->phases = (int*)malloc(sizeof(int) * sim->maxParticles);
+
+
     // map buffers for reading / writing
     float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
     float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
