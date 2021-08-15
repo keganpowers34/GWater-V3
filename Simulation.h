@@ -25,11 +25,9 @@ public:
 	int* phases;
 	NvFlexParams g_params;
 	void initParams();
-	void initSimulation();
 	void startSimulation();
 	void pauseSimulation();
 	void stopSimulation();
-	void internalRun();
 	void setRadius(float r);
 
 	Simulation() {
@@ -37,4 +35,8 @@ public:
 	};
 
 };
+
+extern Simulation* sim;
+
+void initSimulation(Simulation* sim);
 

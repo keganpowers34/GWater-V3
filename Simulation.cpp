@@ -3,6 +3,7 @@
 
 //extern GarrysMod::Lua::ILuaBase* GlobalLUA;
 //extern void printLua(GarrysMod::Lua::ILuaBase* LUA, std::string text);
+
 Simulation* sim = new Simulation();
 
 void Simulation::initParams() {
@@ -64,24 +65,24 @@ void Simulation::initParams() {
 
 };
 
-void internalRun(Simulation& sim) {
+void internalRun(Simulation* sim) {
 
     NvFlexLibrary* library = NvFlexInit();
 
     // create new solver
     NvFlexSolverDesc solverDesc;
     NvFlexSetSolverDescDefaults(&solverDesc);
-    solverDesc.maxParticles = sim.maxParticles;
+    solverDesc.maxParticles = sim->maxParticles;
     solverDesc.maxDiffuseParticles = 0;
 
     NvFlexSolver* solver = NvFlexCreateSolver(library, &solverDesc);
-    NvFlexSetParams(solver, &sim.g_params);
+    NvFlexSetParams(solver, &sim->g_params);
 
 	//alocate our buffers to memory
-    NvFlexBuffer* particleBuffer = NvFlexAllocBuffer(library, sim.maxParticles, sizeof(float4), eNvFlexBufferHost);
-    NvFlexBuffer* velocityBuffer = NvFlexAllocBuffer(library, sim.maxParticles, sizeof(float3), eNvFlexBufferHost);
-    NvFlexBuffer* phaseBuffer = NvFlexAllocBuffer(library, sim.maxParticles, sizeof(int), eNvFlexBufferHost);
-    NvFlexBuffer* activeBuffer = NvFlexAllocBuffer(library, sim.maxParticles, sizeof(int), eNvFlexBufferHost);
+    NvFlexBuffer* particleBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float4), eNvFlexBufferHost);
+    NvFlexBuffer* velocityBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float3), eNvFlexBufferHost);
+    NvFlexBuffer* phaseBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
+    NvFlexBuffer* activeBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
 
 
     // map buffers for reading / writing
@@ -94,7 +95,7 @@ void internalRun(Simulation& sim) {
     velocities[0] = float3{ 0, 1, 0 };
     phases[0] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);
 
-	sim.count++;
+	sim->count++;
 
     // unmap buffers
     NvFlexUnmap(particleBuffer);
@@ -107,22 +108,22 @@ void internalRun(Simulation& sim) {
     NvFlexSetVelocities(solver, velocityBuffer, NULL);
     NvFlexSetPhases(solver, phaseBuffer, NULL);
 
-    while (sim.isValid) {
-        if (!sim.isRunning) continue;
+    while (sim->isValid) {
+        if (!sim->isRunning) continue;
 
         // write to device (async)
         NvFlexSetParticles(solver, particleBuffer, NULL);
         NvFlexSetVelocities(solver, velocityBuffer, NULL);
         NvFlexSetPhases(solver, phaseBuffer, NULL);
         NvFlexSetActive(solver, activeBuffer, NULL);
-        NvFlexSetActiveCount(solver, sim.maxParticles);
+        NvFlexSetActiveCount(solver, sim->maxParticles);
 
         // set active count
-        NvFlexSetParams(solver, &sim.g_params);
-        NvFlexSetActiveCount(solver, sim.maxParticles);
+        NvFlexSetParams(solver, &sim->g_params);
+        NvFlexSetActiveCount(solver, sim->maxParticles);
 
         // tick
-        NvFlexUpdateSolver(solver, sim.deltaTime, 1, false);
+        NvFlexUpdateSolver(solver, sim->deltaTime, 1, false);
 
         // read back (async)
         NvFlexGetParticles(solver, particleBuffer, NULL);
@@ -141,16 +142,14 @@ void internalRun(Simulation& sim) {
     NvFlexShutdown(library);
 }
 
-void initSimulation(Simulation& sim)
+void initSimulation(Simulation* sim)
 {
-	if (sim.isValid) {
-		return;
-	}
+	if (sim->isValid) return;
 
-	std::thread simThread = std::thread(internalRun, std::ref(sim));
+	std::thread simThread = std::thread(internalRun, sim);
 	simThread.detach();
 
-	sim.isValid = true;
+	sim->isValid = true;
 }
 
 void Simulation::startSimulation()
