@@ -9,6 +9,7 @@
 #include <thread>
 #include <string>
 #include <functional>
+#include <mutex>
 
 class Simulation
 {
@@ -22,6 +23,7 @@ public:
 	float3* velocities;
 	float radius = 1.f;
 	float deltaTime = 1.0f / 60.0f;
+	int deltaTime2 = 16.6;
 	int* phases;
 	NvFlexParams g_params;
 	void initParams();

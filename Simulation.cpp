@@ -5,6 +5,12 @@
 //extern void printLua(GarrysMod::Lua::ILuaBase* LUA, std::string text);
 
 Simulation* sim = new Simulation();
+std::mutex* bufferMutex;
+
+static NvFlexBuffer* particleBuffer;
+static NvFlexBuffer* velocityBuffer;
+static NvFlexBuffer* phaseBuffer;
+static NvFlexBuffer* activeBuffer;
 
 void Simulation::initParams() {
 
@@ -57,8 +63,8 @@ void Simulation::initParams() {
 
 	// planes created after particles
 	g_params.planes[0][0] = 0.f;
-	g_params.planes[0][1] = 1.f;
-	g_params.planes[0][2] = 0.f;
+	g_params.planes[0][1] = 0.f;
+	g_params.planes[0][2] = 1.f;
 	g_params.planes[0][3] = 0.f;
 
 	g_params.numPlanes = 1;
@@ -79,39 +85,49 @@ void internalRun(Simulation* sim) {
     NvFlexSetParams(solver, &sim->g_params);
 
 	//alocate our buffers to memory
-    NvFlexBuffer* particleBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float4), eNvFlexBufferHost);
-    NvFlexBuffer* velocityBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float3), eNvFlexBufferHost);
-    NvFlexBuffer* phaseBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
-    NvFlexBuffer* activeBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
-
+    particleBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float4), eNvFlexBufferHost);
+    velocityBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float3), eNvFlexBufferHost);
+    phaseBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
+    activeBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
 
     // map buffers for reading / writing
     float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
     float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
     int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
+	int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
 
-	//sim->particles = &particles;
-
-    // spawn single particle for testin'
-    particles[0] = float4{ 0, 0, 1, 1.f / 2.f };
-    velocities[0] = float3{ 0, 1, 0 };
+    // spawn single particle for testing
+    particles[0] = float4{ 0.f, 0.f, 10.f, 1.f / 2.f };
+    velocities[0] = float3{ 0.f, 0.f, 0.f };
     phases[0] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);
-
+	activeIndices[0] = 0;
 	sim->count++;
 
-    // unmap buffers
-    NvFlexUnmap(particleBuffer);
-    NvFlexUnmap(velocityBuffer);
-    NvFlexUnmap(phaseBuffer);
+	NvFlexUnmap(particleBuffer);
+	NvFlexUnmap(velocityBuffer);
+	NvFlexUnmap(phaseBuffer);
 	NvFlexUnmap(activeBuffer);
 
-    //NvFlexSetParams(solver, &g_params);
-    NvFlexSetParticles(solver, particleBuffer, NULL);
-    NvFlexSetVelocities(solver, velocityBuffer, NULL);
-    NvFlexSetPhases(solver, phaseBuffer, NULL);
+	NvFlexSetParticles(solver, particleBuffer, NULL);
+	NvFlexSetVelocities(solver, velocityBuffer, NULL);
+	NvFlexSetPhases(solver, phaseBuffer, NULL);
+	NvFlexSetActive(solver, activeBuffer, NULL);
+
+	bufferMutex = new std::mutex();
 
     while (sim->isValid) {
-        if (!sim->isRunning) continue;
+
+		//lock mutex
+		bufferMutex->lock();
+
+		if (!sim->isValid) {
+			bufferMutex->unlock();
+			break;
+		}
+
+		if (!sim->isRunning) continue;
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(sim->deltaTime2));
 
 		float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
 		float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
@@ -146,16 +162,21 @@ void internalRun(Simulation* sim) {
         NvFlexGetVelocities(solver, velocityBuffer, NULL);
         NvFlexGetPhases(solver, phaseBuffer, NULL);
 
-		
+		bufferMutex->unlock();
     }
+
+	bufferMutex->lock();
 
 	//shutdown, free memory
     NvFlexFreeBuffer(particleBuffer);
     NvFlexFreeBuffer(velocityBuffer);
     NvFlexFreeBuffer(phaseBuffer);
     NvFlexFreeBuffer(activeBuffer);
+
     NvFlexDestroySolver(solver);
     NvFlexShutdown(library);
+
+	bufferMutex->unlock();
 }
 
 void initSimulation(Simulation* sim)
