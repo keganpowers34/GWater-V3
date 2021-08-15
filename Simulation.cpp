@@ -90,6 +90,8 @@ void internalRun(Simulation* sim) {
     float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
     int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
 
+	//sim->particles = &particles;
+
     // spawn single particle for testin'
     particles[0] = float4{ 0, 0, 1, 1.f / 2.f };
     velocities[0] = float3{ 0, 1, 0 };
@@ -110,6 +112,20 @@ void internalRun(Simulation* sim) {
 
     while (sim->isValid) {
         if (!sim->isRunning) continue;
+
+		float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
+		float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
+		int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
+		int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
+
+		//do rendering here
+
+		sim->particles = particles;
+
+		NvFlexUnmap(particleBuffer);
+		NvFlexUnmap(velocityBuffer);
+		NvFlexUnmap(phaseBuffer);
+		NvFlexUnmap(activeBuffer);
 
         // write to device (async)
         NvFlexSetParticles(solver, particleBuffer, NULL);

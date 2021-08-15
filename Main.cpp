@@ -5,7 +5,13 @@
 
 using namespace GarrysMod::Lua;
 
-//Simulation* refSim = std::ref(sim);
+Vector makeVec(float x, float y, float z) {
+    Vector vec;
+    vec.x = x;
+    vec.y = y;
+    vec.z = z;
+    return vec;
+}
 
 LUA_FUNCTION(GWaterInitSim) {
     initSimulation(sim);
@@ -43,15 +49,42 @@ LUA_FUNCTION(GWaterParticleCount) {
     return 1;
 }
 
+LUA_FUNCTION(GWaterGetParticleData) {
+    int returncount = 0;
+
+    if (!sim->isValid) return 0; //simulation doesnt exist, bail
+
+    for (int i = 0; i < sim->count; ++i)
+    {
+        if (!sim->particles) continue;
+
+        float4 pos = (float4)sim->particles[i];
+        float3 vel = (float3)sim->velocities[i];
+
+        Vector pos2 = makeVec(pos.x, pos.y, pos.z);
+        Vector vel2 = makeVec(vel.x, vel.y, vel.z);
+
+        //printLua(LUA, std::to_string(pos.y));
+        //printLua(LUA, std::to_string(vel.z));
+
+        LUA->PushVector(pos2);
+        LUA->PushVector(vel2);
+        returncount += 2;
+    }
+
+    //printLua(LUA, "IsValid: " + std::to_string(Simulation::isValid) + " | IsRunning: " + std::to_string(Simulation::isRunning) + " | Count: " + std::to_string(Simulation::count));
+    return returncount;
+}
+
 GMOD_MODULE_OPEN() {
 
 
     // push ALL c -> lua functions
     LUA->PushSpecial(SPECIAL_GLOB); //push _G
 
-    //LUA->PushString("GWater_GetParticleData");
-    //LUA->PushCFunction(GWaterGetParticleData);
-    //LUA->SetTable(-3);
+    LUA->PushString("GWater_GetParticleData");
+    LUA->PushCFunction(GWaterGetParticleData);
+    LUA->SetTable(-3);
 
     // push particle data retriever
     //LUA->PushString("GWater_SpawnParticle");
