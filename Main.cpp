@@ -5,13 +5,6 @@
 
 using namespace GarrysMod::Lua;
 
-Vector makeVec(float x, float y, float z) {
-    Vector vec;
-    vec.x = x;
-    vec.y = y;
-    vec.z = z;
-    return vec;
-}
 //potato forced me to add this
 #define ADD_GWATER_FUNC(funcName, tblName) LUA->PushCFunction(funcName); LUA->SetField(-2, tblName);
 
@@ -37,31 +30,26 @@ LUA_FUNCTION(GWaterParticleCount) {
     return 1;
 }
 
+//potatoos function
 LUA_FUNCTION(GWaterGetParticleData) {
-    int returncount = 0;
 
-    if (!sim->isValid) return 0; //simulation doesnt exist, bail
+    LUA->CreateTable();
 
-    for (int i = 0; i < sim->count; ++i)
-    {
-        if (!sim->particles) continue;
+    for (int i = 0; i < sim->count; i++) {
+        LUA->PushNumber(i + 1);
 
-        float4 pos = (float4)sim->particles[i];
-        float3 vel = (float3)sim->velocities[i];
+        float4 thisPos = sim->particles[i];
+        Vector gmodPos;
+        gmodPos.x = thisPos.x;
+        gmodPos.y = thisPos.y;
+        gmodPos.z = thisPos.z;
 
-        Vector pos2 = makeVec(pos.x, pos.y, pos.z);
-        Vector vel2 = makeVec(vel.x, vel.y, vel.z);
-
-        //printLua(LUA, std::to_string(pos.y));
-        //printLua(LUA, std::to_string(vel.z));
-
-        LUA->PushVector(pos2);
-        LUA->PushVector(vel2);
-        returncount += 2;
+        LUA->PushVector(gmodPos);
+        LUA->SetTable(-3);
     }
 
-    //printLua(LUA, "IsValid: " + std::to_string(Simulation::isValid) + " | IsRunning: " + std::to_string(Simulation::isRunning) + " | Count: " + std::to_string(Simulation::count));
-    return returncount;
+    return 1;
+
 }
 
 
@@ -69,7 +57,7 @@ LUA_FUNCTION(GWaterGetParticleData) {
 GMOD_MODULE_OPEN() {
 
     initSimulation(sim);
-
+    printf("SIMULATION INITED");
     // push ALL c -> lua functions
     LUA->PushSpecial(SPECIAL_GLOB); //push _G
 
@@ -91,7 +79,9 @@ GMOD_MODULE_OPEN() {
 
 
 GMOD_MODULE_CLOSE() {
-
+    sim->isValid = false;
+    sim->isRunning = false;
+    sim->count = 0;
 
 	return 0;
 }

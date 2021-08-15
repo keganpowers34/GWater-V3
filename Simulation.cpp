@@ -131,9 +131,10 @@ void internalRun(Simulation* sim) {
 			break;
 		}
 
-		if (!sim->isRunning) continue;
-
 		std::this_thread::sleep_for(std::chrono::milliseconds(sim->deltaTime2));
+
+		if (!sim->isRunning) continue;
+		if (sim->count < 1) continue;
 
 		float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
 		float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
@@ -142,7 +143,7 @@ void internalRun(Simulation* sim) {
 
 		//do rendering here
 
-		memcpy(sim->particles, particles, sizeof(float4) * sim->maxParticles);
+		memcpy(sim->particles, particles, sizeof(float4)* sim->maxParticles);
 
 		NvFlexUnmap(particleBuffer);
 		NvFlexUnmap(velocityBuffer);
