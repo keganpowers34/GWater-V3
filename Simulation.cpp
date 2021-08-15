@@ -120,7 +120,7 @@ void internalRun(Simulation* sim) {
 
 		//do rendering here
 
-		sim->particles = particles;
+		memcpy(sim->particles, particles, sizeof(float4) * sim->maxParticles);
 
 		NvFlexUnmap(particleBuffer);
 		NvFlexUnmap(velocityBuffer);
