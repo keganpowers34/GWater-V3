@@ -77,7 +77,7 @@ GMOD_MODULE_OPEN() {
 
     ADD_GWATER_FUNC(GWaterUnpauseSim, "Unpause");
     ADD_GWATER_FUNC(GWaterPauseSim, "Pause");
-    ADD_GWATER_FUNC(GWaterDeleteSim, "DeleteAll");
+    ADD_GWATER_FUNC(GWaterDeleteSim, "DeleteSimulation");
     ADD_GWATER_FUNC(GWaterGetParticleData, "GetData");
 
     LUA->SetField(-2, "gwater");
