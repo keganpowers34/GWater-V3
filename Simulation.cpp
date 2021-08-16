@@ -18,62 +18,64 @@ Simulation::Simulation() {
 }
 
 void Simulation::initParams() {
+	NvFlexParams g_params_t;
 
-	g_params.gravity[0] = 0.0f;
-	g_params.gravity[1] = 0.f;
-	g_params.gravity[2] = -9.8f;		//z is down, not y
+	g_params_t.gravity[0] = 0.0f;
+	g_params_t.gravity[1] = 0.f;
+	g_params_t.gravity[2] = -9.8f;		//z is down, not y
 
-	g_params.radius = Simulation::radius;
-	g_params.viscosity = 0.01f;
-	g_params.dynamicFriction = 0.1f;
-	g_params.staticFriction = 0.1f;
-	g_params.particleFriction = 0.1f; // scale friction between particles by default
-	g_params.freeSurfaceDrag = 0.1f;
-	g_params.drag = 0.0f;
-	g_params.lift = 0.0f;
-	g_params.numIterations = 1;
-	g_params.fluidRestDistance = Simulation::radius / 1.5f;
-	g_params.solidRestDistance = 0.0f;
+	g_params_t.radius = Simulation::radius;
+	g_params_t.viscosity = 0.01f;
+	g_params_t.dynamicFriction = 0.1f;
+	g_params_t.staticFriction = 0.1f;
+	g_params_t.particleFriction = 0.1f; // scale friction between particles by default
+	g_params_t.freeSurfaceDrag = 0.1f;
+	g_params_t.drag = 0.0f;
+	g_params_t.lift = 0.0f;
+	g_params_t.numIterations = 1;
+	g_params_t.fluidRestDistance = Simulation::radius / 1.5f;
+	g_params_t.solidRestDistance = 0.0f;
 
-	g_params.anisotropyScale = 1.0f;
-	g_params.anisotropyMin = 0.1f;
-	g_params.anisotropyMax = 2.0f;
-	g_params.smoothing = 1.0f;
+	g_params_t.anisotropyScale = 1.0f;
+	g_params_t.anisotropyMin = 0.1f;
+	g_params_t.anisotropyMax = 2.0f;
+	g_params_t.smoothing = 1.0f;
 
-	g_params.dissipation = 0.0f;
-	g_params.damping = 0.0f;
-	g_params.particleCollisionMargin = 0.0f;
-	g_params.shapeCollisionMargin = 0.0f;
-	g_params.collisionDistance = 0.0f;
-	g_params.sleepThreshold = 0.0f;
-	g_params.shockPropagation = 0.0f;
-	g_params.restitution = 0.0f;
+	g_params_t.dissipation = 0.0f;
+	g_params_t.damping = 0.0f;
+	g_params_t.particleCollisionMargin = 0.0f;
+	g_params_t.shapeCollisionMargin = 0.0f;
+	g_params_t.collisionDistance = 0.0f;
+	g_params_t.sleepThreshold = 0.0f;
+	g_params_t.shockPropagation = 0.0f;
+	g_params_t.restitution = 0.0f;
 
-	g_params.maxSpeed = FLT_MAX;
-	g_params.maxAcceleration = 100.0f;	// approximately 10x gravity
+	g_params_t.maxSpeed = FLT_MAX;
+	g_params_t.maxAcceleration = 100.0f;	// approximately 10x gravity
 
-	g_params.relaxationMode = eNvFlexRelaxationLocal;
-	g_params.relaxationFactor = 1.0f;
-	g_params.solidPressure = 1.0f;
-	g_params.adhesion = 0.005f;
-	g_params.cohesion = 0.015f;
-	g_params.surfaceTension = 0.0f;
-	g_params.vorticityConfinement = 0.0f;
-	g_params.buoyancy = 1.0f;
-	g_params.diffuseThreshold = 100.0f;
-	g_params.diffuseBuoyancy = 1.0f;
-	g_params.diffuseDrag = 0.8f;
-	g_params.diffuseBallistic = 16;
-	g_params.diffuseLifetime = 2.0f;
+	g_params_t.relaxationMode = eNvFlexRelaxationLocal;
+	g_params_t.relaxationFactor = 1.0f;
+	g_params_t.solidPressure = 1.0f;
+	g_params_t.adhesion = 0.005f;
+	g_params_t.cohesion = 0.015f;
+	g_params_t.surfaceTension = 0.0f;
+	g_params_t.vorticityConfinement = 0.0f;
+	g_params_t.buoyancy = 1.0f;
+	g_params_t.diffuseThreshold = 100.0f;
+	g_params_t.diffuseBuoyancy = 1.0f;
+	g_params_t.diffuseDrag = 0.8f;
+	g_params_t.diffuseBallistic = 16;
+	g_params_t.diffuseLifetime = 2.0f;
 
 	// planes created after particles
-	g_params.planes[0][0] = 0.f;
-	g_params.planes[0][1] = 0.f;
-	g_params.planes[0][2] = 1.f;
-	g_params.planes[0][3] = 0.f;
+	g_params_t.planes[0][0] = 0.f;
+	g_params_t.planes[0][1] = 0.f;
+	g_params_t.planes[0][2] = 1.f;
+	g_params_t.planes[0][3] = 0.f;
 
-	g_params.numPlanes = 1;
+	g_params_t.numPlanes = 1;
 
+	sim->g_params = &g_params_t;
 };
 
 void internalRun(Simulation* sim) {
@@ -87,7 +89,7 @@ void internalRun(Simulation* sim) {
 	solverDesc.maxDiffuseParticles = 0;
 
 	NvFlexSolver* solver = NvFlexCreateSolver(library, &solverDesc);
-	NvFlexSetParams(solver, &sim->g_params);
+	NvFlexSetParams(solver, sim->g_params);
 
 	//alocate our buffers to memory
 	particleBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float4), eNvFlexBufferHost);
@@ -158,7 +160,7 @@ void internalRun(Simulation* sim) {
 		NvFlexSetActiveCount(solver, sim->count);
 
 		// set active count
-		NvFlexSetParams(solver, &sim->g_params);
+		NvFlexSetParams(solver, sim->g_params);
 		NvFlexSetActiveCount(solver, sim->count);
 
 		// tick

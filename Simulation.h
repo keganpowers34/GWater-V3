@@ -25,7 +25,7 @@ public:
 	float deltaTime = 1.f / 30.f;
 	int deltaTime2 = 8;
 	int* phases;
-	NvFlexParams g_params;
+	NvFlexParams* g_params;
 	std::thread thread;
 	void initParams();
 	void startSimulation();
@@ -35,6 +35,7 @@ public:
 	void makeCube(float3 center, float3 size, int phase);
 	void setRadius(float r);
 
+	// issue #11
 	Simulation();
 };
 
