@@ -35,10 +35,7 @@ public:
 	void makeCube(float3 center, float3 size, int phase);
 	void setRadius(float r);
 
-	Simulation() {
-		initParams();
-	};
-
+	Simulation();
 };
 
 extern Simulation* sim;

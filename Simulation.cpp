@@ -12,6 +12,10 @@ static NvFlexBuffer* velocityBuffer;
 static NvFlexBuffer* phaseBuffer;
 static NvFlexBuffer* activeBuffer;
 
+Simulation::Simulation() {
+	initParams();
+}
+
 void Simulation::initParams() {
 
 	g_params.gravity[0] = 0.0f;
