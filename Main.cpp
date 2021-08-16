@@ -88,7 +88,7 @@ GMOD_MODULE_OPEN() {
 
     LUA->CreateTable();
 
-    ADD_GWATER_FUNC(GWaterInitSim, "Initialise");
+    ADD_GWATER_FUNC(GWaterInitSim, "Initialize");
     ADD_GWATER_FUNC(GWaterUnpauseSim, "Unpause");
     ADD_GWATER_FUNC(GWaterPauseSim, "Pause");
     ADD_GWATER_FUNC(GWaterDeleteSim, "DeleteSimulation");
