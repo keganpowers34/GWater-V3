@@ -32,7 +32,6 @@ public:
 	void stopSimulation();
 	void addParticle(float4 pos, float3 vel, int phase);
 	void makeCube(float3 center, float3 size, int phase);
-	void setRadius(float r);
 
 	// issue #11
 	Simulation();

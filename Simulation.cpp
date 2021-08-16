@@ -261,9 +261,7 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 }
 
 //sets radius of particle colliders
-void Simulation::setRadius(float r) {
-	radius = r;
-};
+//removed since kinda pointless sorry mee
 
 /* //depricated function
 void Simulation::SpawnParticle(Vector pos, Vector vel) {
