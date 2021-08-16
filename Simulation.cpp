@@ -12,6 +12,7 @@ static NvFlexBuffer* velocityBuffer;
 static NvFlexBuffer* phaseBuffer;
 static NvFlexBuffer* activeBuffer;
 
+//issue #11
 Simulation::Simulation() {
 	initParams();
 }
@@ -49,7 +50,7 @@ void Simulation::initParams() {
 	g_params.restitution = 0.0f;
 
 	g_params.maxSpeed = FLT_MAX;
-	g_params.maxAcceleration = 100.0f;    // approximately 10x gravity
+	g_params.maxAcceleration = 100.0f;	// approximately 10x gravity
 
 	g_params.relaxationMode = eNvFlexRelaxationLocal;
 	g_params.relaxationFactor = 1.0f;
@@ -77,22 +78,22 @@ void Simulation::initParams() {
 
 void internalRun(Simulation* sim) {
 
-    NvFlexLibrary* library = NvFlexInit();
+	NvFlexLibrary* library = NvFlexInit();
 
-    // create new solver
-    NvFlexSolverDesc solverDesc;
-    NvFlexSetSolverDescDefaults(&solverDesc);
-    solverDesc.maxParticles = sim->maxParticles;
-    solverDesc.maxDiffuseParticles = 0;
+	// create new solver
+	NvFlexSolverDesc solverDesc;
+	NvFlexSetSolverDescDefaults(&solverDesc);
+	solverDesc.maxParticles = sim->maxParticles;
+	solverDesc.maxDiffuseParticles = 0;
 
-    NvFlexSolver* solver = NvFlexCreateSolver(library, &solverDesc);
-    NvFlexSetParams(solver, &sim->g_params);
+	NvFlexSolver* solver = NvFlexCreateSolver(library, &solverDesc);
+	NvFlexSetParams(solver, &sim->g_params);
 
 	//alocate our buffers to memory
-    particleBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float4), eNvFlexBufferHost);
-    velocityBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float3), eNvFlexBufferHost);
-    phaseBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
-    activeBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
+	particleBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float4), eNvFlexBufferHost);
+	velocityBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(float3), eNvFlexBufferHost);
+	phaseBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
+	activeBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
 
 	//idk what tf this do
 	sim->particles = (float4*)malloc(sizeof(float4) * sim->maxParticles);
@@ -100,13 +101,13 @@ void internalRun(Simulation* sim) {
 	sim->phases = (int*)malloc(sizeof(int) * sim->maxParticles);
 
 
-    // map buffers for reading / writing
-    float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
-    float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
-    int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
+	// map buffers for reading / writing
+	float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
+	float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
+	int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
 	int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
 
-    // spawn single particle for testing
+	// spawn single particle for testing
 	// this code has been moved into Simulation::addParticle by yours truly
 	// :moyai:
 
@@ -122,7 +123,7 @@ void internalRun(Simulation* sim) {
 
 	bufferMutex = new std::mutex();
 
-    while (sim->isValid) {
+	while (sim->isValid) {
 
 		if (!sim->isValid) {
 			bufferMutex->unlock();
@@ -155,36 +156,36 @@ void internalRun(Simulation* sim) {
 		NvFlexUnmap(phaseBuffer);
 		NvFlexUnmap(activeBuffer);
 
-        // write to device (async)
-        NvFlexSetParticles(solver, particleBuffer, NULL);
-        NvFlexSetVelocities(solver, velocityBuffer, NULL);
-        NvFlexSetPhases(solver, phaseBuffer, NULL);
-        NvFlexSetActive(solver, activeBuffer, NULL);
+		// write to device (async)
+		NvFlexSetParticles(solver, particleBuffer, NULL);
+		NvFlexSetVelocities(solver, velocityBuffer, NULL);
+		NvFlexSetPhases(solver, phaseBuffer, NULL);
+		NvFlexSetActive(solver, activeBuffer, NULL);
 		NvFlexSetActiveCount(solver, sim->count);
 
-        // set active count
-        NvFlexSetParams(solver, &sim->g_params);
+		// set active count
+		NvFlexSetParams(solver, &sim->g_params);
 		NvFlexSetActiveCount(solver, sim->count);
 
-        // tick
-        NvFlexUpdateSolver(solver, sim->deltaTime, 1, false);
+		// tick
+		NvFlexUpdateSolver(solver, sim->deltaTime, 1, false);
 
-        // read back (async)
-        NvFlexGetParticles(solver, particleBuffer, NULL);
-        NvFlexGetVelocities(solver, velocityBuffer, NULL);
-        NvFlexGetPhases(solver, phaseBuffer, NULL);
+		// read back (async)
+		NvFlexGetParticles(solver, particleBuffer, NULL);
+		NvFlexGetVelocities(solver, velocityBuffer, NULL);
+		NvFlexGetPhases(solver, phaseBuffer, NULL);
 
 		bufferMutex->unlock();
-    }
+	}
 
 	//shutdown, free memory
-    NvFlexFreeBuffer(particleBuffer);
-    NvFlexFreeBuffer(velocityBuffer);
-    NvFlexFreeBuffer(phaseBuffer);
-    NvFlexFreeBuffer(activeBuffer);
+	NvFlexFreeBuffer(particleBuffer);
+	NvFlexFreeBuffer(velocityBuffer);
+	NvFlexFreeBuffer(phaseBuffer);
+	NvFlexFreeBuffer(activeBuffer);
 
-    NvFlexDestroySolver(solver);
-    NvFlexShutdown(library);
+	NvFlexDestroySolver(solver);
+	NvFlexShutdown(library);
 }
 
 void initSimulation(Simulation* sim)
@@ -286,7 +287,7 @@ void Simulation::SpawnParticle(Vector pos, Vector vel) {
 
 	particles[count] = posconv;
 	velocities[count] = velconv;
-	phases[count] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);    //make fluid phase, not cloth
+	phases[count] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);	//make fluid phase, not cloth
 
 
 	NvFlexBuffer* activeBuffer = NvFlexAllocBuffer(library, maxParticles, sizeof(int), eNvFlexBufferHost);
