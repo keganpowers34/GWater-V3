@@ -124,12 +124,6 @@ void internalRun(Simulation* sim) {
 	bufferMutex = new std::mutex();
 
 	while (sim->isValid) {
-
-		if (!sim->isValid) {
-			bufferMutex->unlock();
-			break;
-		}
-
 		std::this_thread::sleep_for(std::chrono::milliseconds(sim->deltaTime2));
 
 		if (!sim->isRunning) continue;
