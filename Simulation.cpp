@@ -126,7 +126,8 @@ void internalRun(Simulation* sim) {
 	bufferMutex = new std::mutex();
 
 	while (sim->isValid) {
-		std::this_thread::sleep_for(std::chrono::milliseconds((int)(sim->deltaTime * 1000)));
+
+		std::this_thread::sleep_for(std::chrono::duration<float>(sim->deltaTime));
 
 		if (!sim->isRunning) continue;
 		if (sim->count < 1) continue;
@@ -212,6 +213,12 @@ void Simulation::stopSimulation()
 }
 
 void Simulation::addParticle(float4 pos, float3 vel, int phase) {
+	if (!sim->isValid) {
+		return;
+	};
+
+	bufferMutex->lock();
+
 	float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
 	float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
 	int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
@@ -229,9 +236,17 @@ void Simulation::addParticle(float4 pos, float3 vel, int phase) {
 	NvFlexUnmap(velocityBuffer);
 	NvFlexUnmap(phaseBuffer);
 	NvFlexUnmap(activeBuffer);
+
+	bufferMutex->unlock();
 }
 
 void Simulation::makeCube(float3 center, float3 size, int phase) {
+	if (!sim->isValid) {
+		return;
+	};
+
+	bufferMutex->lock();
+
 	float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
 	float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
 	int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
@@ -258,40 +273,10 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 	NvFlexUnmap(velocityBuffer);
 	NvFlexUnmap(phaseBuffer);
 	NvFlexUnmap(activeBuffer);
+
+	bufferMutex->unlock();
 }
 
 //sets radius of particle colliders
 //removed since kinda pointless sorry mee
-
-/* //depricated function
-void Simulation::SpawnParticle(Vector pos, Vector vel) {
-	if (!Simulation::isValid || solver == nullptr) {
-		return;
-	}
-
-	count++;
-
-	float4 posconv = { pos.x, pos.y, pos.z, 0 };
-	float3 velconv = { vel.x, vel.y, vel.z };
-
-	// map buffers for reading / writing
-	if (particles == nullptr) particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
-	if (velocities == nullptr) velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
-	if (phases == nullptr) phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
-
-	particles[count] = posconv;
-	velocities[count] = velconv;
-	phases[count] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);	//make fluid phase, not cloth
-
-
-	NvFlexBuffer* activeBuffer = NvFlexAllocBuffer(library, maxParticles, sizeof(int), eNvFlexBufferHost);
-
-	int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
-
-	activeIndices[count] = count;
-	NvFlexUnmap(activeBuffer);
-
-	NvFlexSetActive(solver, activeBuffer, NULL);
-	NvFlexSetActiveCount(solver, count);
-}
-*/
+//:(
