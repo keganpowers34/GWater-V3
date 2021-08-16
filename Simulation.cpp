@@ -184,14 +184,14 @@ void internalRun(Simulation* sim) {
 	NvFlexShutdown(library);
 }
 
-void initSimulation(Simulation* sim)
+void initSimulation(Simulation* g_sim)
 {
-	if (sim->isValid) return;
+	if (g_sim->isValid) return;
 
-	sim->thread = std::thread(internalRun, sim);
-	sim->thread.detach();
+	g_sim->thread = std::thread(internalRun, sim);
+	g_sim->thread.detach();
 
-	sim->isValid = true;
+	g_sim->isValid = true;
 }
 
 void Simulation::startSimulation()
