@@ -8,6 +8,11 @@ using namespace GarrysMod::Lua;
 //potato forced me to add this
 #define ADD_GWATER_FUNC(funcName, tblName) LUA->PushCFunction(funcName); LUA->SetField(-2, tblName);
 
+LUA_FUNCTION(GWaterInitSim) {
+    initSimulation(sim);
+    return 0;
+}
+
 LUA_FUNCTION(GWaterUnpauseSim) {
     sim->isRunning = true;
     return 0;
@@ -36,7 +41,7 @@ LUA_FUNCTION(GWaterGetParticleData) {
     LUA->CreateTable();
 
     for (int i = 0; i < sim->count; i++) {
-        LUA->PushNumber(i + 1);
+        LUA->PushNumber((double)i + 1); //double cast to avoid C26451 arithmetic overflow
 
         float4 thisPos = sim->particles[i];
         Vector gmodPos;
@@ -52,21 +57,44 @@ LUA_FUNCTION(GWaterGetParticleData) {
 
 }
 
+LUA_FUNCTION(GWaterSpawnParticle) {
+    if (!sim->isValid) return 0;
+
+    Vector pos = LUA->GetVector(-2);
+    Vector vel = LUA->GetVector(-1);
+
+    sim->addParticle(float4{ pos.x, pos.y, pos.z, 1.f / 2.f }, float3{ vel.x, vel.y, vel.z }, NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid));
+
+    return 0;
+}
+
+LUA_FUNCTION(GWaterMakeWaterCube) {
+    if (!sim->isValid) return 0;
+
+    Vector center = LUA->GetVector(-2);
+    Vector size = LUA->GetVector(-1);
+
+    sim->makeCube(float3{ center.x, center.y, center.z }, float3{ size.x, size.y, size.z }, NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid));
+
+    return 0;
+}
+
 
 
 GMOD_MODULE_OPEN() {
-
-    initSimulation(sim);
-    printf("SIMULATION INITED");
+    printf("gWater v1.5");
     // push ALL c -> lua functions
     LUA->PushSpecial(SPECIAL_GLOB); //push _G
 
     LUA->CreateTable();
 
+    ADD_GWATER_FUNC(GWaterInitSim, "Initialize");
     ADD_GWATER_FUNC(GWaterUnpauseSim, "Unpause");
     ADD_GWATER_FUNC(GWaterPauseSim, "Pause");
     ADD_GWATER_FUNC(GWaterDeleteSim, "DeleteSimulation");
     ADD_GWATER_FUNC(GWaterGetParticleData, "GetData");
+    ADD_GWATER_FUNC(GWaterSpawnParticle, "SpawnParticle");
+    ADD_GWATER_FUNC(GWaterMakeWaterCube, "MakeCube");
 
     LUA->SetField(-2, "gwater");
     LUA->Pop(); // pop _G
