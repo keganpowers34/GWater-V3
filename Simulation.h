@@ -22,8 +22,7 @@ public:
 	float4* particles;
 	float3* velocities;
 	float radius = 1;
-	float deltaTime = 1.f / 30.f;
-	int deltaTime2 = 8;
+	float deltaTime = 1.f / 60.f;
 	int* phases;
 	NvFlexParams* g_params;
 	std::thread thread;
