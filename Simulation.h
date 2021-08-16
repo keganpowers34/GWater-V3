@@ -21,9 +21,9 @@ public:
 
 	float4* particles;
 	float3* velocities;
-	float radius = 1.f;
-	float deltaTime = 1.0f / 60.0f;
-	int deltaTime2 = 16.6;
+	float radius = 1;
+	float deltaTime = 1.f / 30.f;
+	int deltaTime2 = 8;
 	int* phases;
 	NvFlexParams g_params;
 	std::thread thread;
@@ -31,6 +31,8 @@ public:
 	void startSimulation();
 	void pauseSimulation();
 	void stopSimulation();
+	void addParticle(float4 pos, float3 vel, int phase);
+	void makeCube(float3 center, float3 size, int phase);
 	void setRadius(float r);
 
 	Simulation() {
