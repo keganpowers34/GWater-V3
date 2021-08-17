@@ -253,9 +253,15 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 	for (float z = -size.z / 2; z <= size.z / 2; z++) {
 		for (float y = -size.y / 2; y <= size.y / 2; y++) {
 			for (float x = -size.x / 2; x <= size.x / 2; z++) {
+				//shitter moment, it appears you are out of particles
+				if (sim->count >= sim->maxParticles) {
+					bufferMutex->unlock();
+					return;
+				}
+
 				float4 pos = float4{ center.x + x * radius, center.y + y * radius, center.z + z * radius, 1.f / 2.f };
 				particles[sim->count] = pos;
-				velocities[sim->count] = float3{0, 0, 0};
+				velocities[sim->count] = float3{0.f, 0.f, 0.f};
 				phases[sim->count] = phase;
 				activeIndices[sim->count] = sim->count;
 

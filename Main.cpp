@@ -94,7 +94,7 @@ GMOD_MODULE_OPEN() {
 	ADD_GWATER_FUNC(GWaterDeleteSim, "DeleteSimulation");
 	ADD_GWATER_FUNC(GWaterGetParticleData, "GetData");
 	ADD_GWATER_FUNC(GWaterSpawnParticle, "SpawnParticle");
-	ADD_GWATER_FUNC(GWaterMakeWaterCube, "MakeCube");
+	ADD_GWATER_FUNC(GWaterMakeWaterCube, "SpawnCube");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); // pop _G
