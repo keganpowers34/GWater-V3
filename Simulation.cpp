@@ -3,15 +3,14 @@
 #include <sstream>
 
 //extern GarrysMod::Lua::ILuaBase* LUA;
-<<<<<<< Updated upstream
-extern void PrintLUA(std::string text);
-=======
+
+//extern void PrintLUA(std::string text);
+
 
 //extern void printLua(GarrysMod::Lua::ILuaBase* LUA, std::string text);
 
 //extern void PrintLUA(std::string text);
 
->>>>>>> Stashed changes
 
 Simulation* sim = new Simulation();
 std::mutex* bufferMutex = nullptr;
@@ -119,15 +118,12 @@ void internalRun(Simulation* sim) {
 
 		//lock mutex
 		bufferMutex->lock();
-<<<<<<< Updated upstream
-=======
 
 		if (!sim->isValid) {
 			bufferMutex->unlock();
 			break;
 		}
 	
->>>>>>> Stashed changes
 
 		float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
 		float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
@@ -208,10 +204,8 @@ void Simulation::addParticle(float4 pos, float3 vel, int phase) {
 		return;
 	};
 
-<<<<<<< Updated upstream
-=======
+
 	//we need to lock
->>>>>>> Stashed changes
 	bufferMutex->lock();
 
 	float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
@@ -220,10 +214,6 @@ void Simulation::addParticle(float4 pos, float3 vel, int phase) {
 	int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
 
 	if (!particles || !velocities || !phases || !activeIndices) {
-<<<<<<< Updated upstream
-		//fixes C26115 failing to release mutex lock
-=======
->>>>>>> Stashed changes
 		bufferMutex->unlock();
 		return;
 	};
@@ -268,21 +258,11 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 				velocities[sim->count] = float3{0, 0, 0};
 				phases[sim->count] = phase;
 				activeIndices[sim->count] = sim->count;
-<<<<<<< Updated upstream
-
-				//if only cpp had string + number + string + etc
-				std::stringstream str;
-				str << sim->count << ": " << pos.x << "," << pos.y << "," << pos.z;
-				PrintLUA(str.str());
-=======
-				printf("%d: %f, %f, %f\n", sim->count, pos.x, pos.y, pos.z);
 
 				//if only cpp had string + number + string + etc
 				//std::stringstream str;
 				//str << sim->count << ": " << pos.x << "," << pos.y << "," << pos.z;
 				//PrintLUA(str.str());
->>>>>>> Stashed changes
-
 				sim->count++;
 			}
 		}

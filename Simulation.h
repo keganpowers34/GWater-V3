@@ -25,7 +25,7 @@ public:
 	float radius = 1;
 	float deltaTime = 1.f / 60.f;
 	int* phases;
-	NvFlexParams* g_params;
+	NvFlexParams g_params;
 	std::thread thread;
 	void initParams();
 	void startSimulation();
