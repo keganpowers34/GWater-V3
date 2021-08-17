@@ -28,7 +28,7 @@ Simulation::Simulation() {
 void Simulation::initParams() {
 	g_params.gravity[0] = 0.0f;
 	g_params.gravity[1] = 0.f;
-	g_params.gravity[2] = -9.8f;		//z is down, not y
+	g_params.gravity[2] = -20.8f;		//z is down, not y
 
 	g_params.radius = Simulation::radius;
 	g_params.viscosity = 0.01f;
@@ -152,7 +152,7 @@ void internalRun(Simulation* sim) {
 
 		// tick
 		NvFlexSetParams(solver, &sim->g_params);
-		NvFlexUpdateSolver(solver, sim->deltaTime, 1, false);
+		NvFlexUpdateSolver(solver, sim->deltaTime * 2.f, 1, false);
 
 		// read back (async)
 		NvFlexGetParticles(solver, particleBuffer, NULL);
@@ -172,8 +172,7 @@ void internalRun(Simulation* sim) {
 	NvFlexShutdown(library);
 }
 
-void initSimulation()
-{
+void initSimulation(){
 	if (sim->isValid) return;
 
 	sim->thread = std::thread(internalRun, sim);
@@ -182,21 +181,25 @@ void initSimulation()
 	sim->isValid = true;
 }
 
-void Simulation::startSimulation()
-{
+void Simulation::startSimulation(){
 	isRunning = true;
 }
 
-void Simulation::pauseSimulation()
-{
+void Simulation::pauseSimulation(){
 	isRunning = false;
 }
 
-void Simulation::stopSimulation()
-{
+void Simulation::stopSimulation(){
 	isValid = false;
 	isRunning = false;
 	count = 0;
+}
+
+void Simulation::setRadius(float r) {
+	radius = r;
+	g_params.radius = r;
+	g_params.fluidRestDistance = r / 1.5f;
+
 }
 
 void Simulation::addParticle(float4 pos, float3 vel, int phase) {
@@ -252,7 +255,7 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 
 	for (float z = -size.z / 2; z <= size.z / 2; z++) {
 		for (float y = -size.y / 2; y <= size.y / 2; y++) {
-			for (float x = -size.x / 2; x <= size.x / 2; z++) {
+			for (float x = -size.x / 2; x <= size.x / 2; x++) {
 				//shitter moment, it appears you are out of particles
 				if (sim->count >= sim->maxParticles) {
 					bufferMutex->unlock();

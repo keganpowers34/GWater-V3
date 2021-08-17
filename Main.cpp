@@ -78,6 +78,14 @@ LUA_FUNCTION(GWaterMakeWaterCube) {
 
 	return 0;
 }
+LUA_FUNCTION(GWaterSetRadius) {
+	if (!sim->isValid) return 0;
+
+	float r = static_cast<float>(LUA->GetNumber(-1));
+	sim->setRadius(r);
+
+	return 0;
+}
 
 
 
@@ -95,6 +103,7 @@ GMOD_MODULE_OPEN() {
 	ADD_GWATER_FUNC(GWaterGetParticleData, "GetData");
 	ADD_GWATER_FUNC(GWaterSpawnParticle, "SpawnParticle");
 	ADD_GWATER_FUNC(GWaterMakeWaterCube, "SpawnCube");
+	ADD_GWATER_FUNC(GWaterSetRadius, "SetRadius");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); // pop _G
