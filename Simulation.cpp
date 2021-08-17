@@ -3,7 +3,15 @@
 #include <sstream>
 
 //extern GarrysMod::Lua::ILuaBase* LUA;
+<<<<<<< Updated upstream
 extern void PrintLUA(std::string text);
+=======
+
+//extern void printLua(GarrysMod::Lua::ILuaBase* LUA, std::string text);
+
+//extern void PrintLUA(std::string text);
+
+>>>>>>> Stashed changes
 
 Simulation* sim = new Simulation();
 std::mutex* bufferMutex = nullptr;
@@ -94,31 +102,11 @@ void internalRun(Simulation* sim) {
 	phaseBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
 	activeBuffer = NvFlexAllocBuffer(library, sim->maxParticles, sizeof(int), eNvFlexBufferHost);
 
-	//idk what tf this do
+	//allocates how big the array of stuff is
 	sim->particles = (float4*)malloc(sizeof(float4) * sim->maxParticles);
 	sim->velocities = (float3*)malloc(sizeof(float3) * sim->maxParticles);
 	sim->phases = (int*)malloc(sizeof(int) * sim->maxParticles);
-
-
-	// map buffers for reading / writing
-	float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
-	float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
-	int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
-	int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
-
-	// spawn single particle for testing
-	// this code has been moved into Simulation::addParticle by yours truly
-	// :moyai:
-
-	NvFlexUnmap(particleBuffer);
-	NvFlexUnmap(velocityBuffer);
-	NvFlexUnmap(phaseBuffer);
-	NvFlexUnmap(activeBuffer);
-
-	NvFlexSetParticles(solver, particleBuffer, NULL);
-	NvFlexSetVelocities(solver, velocityBuffer, NULL);
-	NvFlexSetPhases(solver, phaseBuffer, NULL);
-	NvFlexSetActive(solver, activeBuffer, NULL);
+	sim->activeIndices = (int*)malloc(sizeof(int) * sim->maxParticles);
 
 	bufferMutex = new std::mutex();
 
@@ -131,6 +119,15 @@ void internalRun(Simulation* sim) {
 
 		//lock mutex
 		bufferMutex->lock();
+<<<<<<< Updated upstream
+=======
+
+		if (!sim->isValid) {
+			bufferMutex->unlock();
+			break;
+		}
+	
+>>>>>>> Stashed changes
 
 		float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
 		float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
@@ -157,11 +154,8 @@ void internalRun(Simulation* sim) {
 		NvFlexSetActive(solver, activeBuffer, NULL);
 		NvFlexSetActiveCount(solver, sim->count);
 
-		// set active count
-		NvFlexSetParams(solver, &sim->g_params);
-		NvFlexSetActiveCount(solver, sim->count);
-
 		// tick
+		NvFlexSetParams(solver, &sim->g_params);
 		NvFlexUpdateSolver(solver, sim->deltaTime, 1, false);
 
 		// read back (async)
@@ -214,6 +208,10 @@ void Simulation::addParticle(float4 pos, float3 vel, int phase) {
 		return;
 	};
 
+<<<<<<< Updated upstream
+=======
+	//we need to lock
+>>>>>>> Stashed changes
 	bufferMutex->lock();
 
 	float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
@@ -222,7 +220,10 @@ void Simulation::addParticle(float4 pos, float3 vel, int phase) {
 	int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
 
 	if (!particles || !velocities || !phases || !activeIndices) {
+<<<<<<< Updated upstream
 		//fixes C26115 failing to release mutex lock
+=======
+>>>>>>> Stashed changes
 		bufferMutex->unlock();
 		return;
 	};
@@ -267,11 +268,20 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 				velocities[sim->count] = float3{0, 0, 0};
 				phases[sim->count] = phase;
 				activeIndices[sim->count] = sim->count;
+<<<<<<< Updated upstream
 
 				//if only cpp had string + number + string + etc
 				std::stringstream str;
 				str << sim->count << ": " << pos.x << "," << pos.y << "," << pos.z;
 				PrintLUA(str.str());
+=======
+				printf("%d: %f, %f, %f\n", sim->count, pos.x, pos.y, pos.z);
+
+				//if only cpp had string + number + string + etc
+				//std::stringstream str;
+				//str << sim->count << ": " << pos.x << "," << pos.y << "," << pos.z;
+				//PrintLUA(str.str());
+>>>>>>> Stashed changes
 
 				sim->count++;
 			}
@@ -286,6 +296,3 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 	bufferMutex->unlock();
 }
 
-//sets radius of particle colliders
-//removed since kinda pointless sorry mee
-//:(

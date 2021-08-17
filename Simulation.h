@@ -21,6 +21,7 @@ public:
 
 	float4* particles;
 	float3* velocities;
+	int* activeIndices;
 	float radius = 1;
 	float deltaTime = 1.f / 60.f;
 	int* phases;
