@@ -39,5 +39,5 @@ public:
 
 extern Simulation* sim;
 
-void initSimulation(Simulation* g_sim);
+void initSimulation();
 

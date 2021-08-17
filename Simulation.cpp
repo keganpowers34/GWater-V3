@@ -185,14 +185,14 @@ void internalRun(Simulation* sim) {
 	NvFlexShutdown(library);
 }
 
-void initSimulation(Simulation* g_sim)
+void initSimulation()
 {
-	if (g_sim->isValid) return;
+	if (sim->isValid) return;
 
-	g_sim->thread = std::thread(internalRun, sim);
-	g_sim->thread.detach();
+	sim->thread = std::thread(internalRun, sim);
+	sim->thread.detach();
 
-	g_sim->isValid = true;
+	sim->isValid = true;
 }
 
 void Simulation::startSimulation()
@@ -224,7 +224,11 @@ void Simulation::addParticle(float4 pos, float3 vel, int phase) {
 	int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
 	int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
 
-	if (!particles || !velocities || !phases || !activeIndices) return;
+	if (!particles || !velocities || !phases || !activeIndices) {
+		//fixes C26115 failing to release mutex lock
+		bufferMutex->unlock();
+		return;
+	};
 
 	particles[sim->count] = pos;
 	velocities[sim->count] = vel;
@@ -252,7 +256,11 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 	int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
 	int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
 
-	if (!particles || !velocities || !phases || !activeIndices) return;
+	if (!particles || !velocities || !phases || !activeIndices) {
+		//fixes C26115 failing to release mutex lock
+		bufferMutex->unlock();
+		return;
+	};
 
 	for (float z = -size.z / 2; z <= size.z / 2; z++) {
 		for (float y = -size.y / 2; y <= size.y / 2; y++) {

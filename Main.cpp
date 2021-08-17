@@ -9,7 +9,7 @@ using namespace GarrysMod::Lua;
 #define ADD_GWATER_FUNC(funcName, tblName) LUA->PushCFunction(funcName); LUA->SetField(-2, tblName);
 
 LUA_FUNCTION(GWaterInitSim) {
-	initSimulation(sim);
+	initSimulation();
 	return 0;
 }
 
