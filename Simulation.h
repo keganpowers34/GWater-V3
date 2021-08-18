@@ -14,26 +14,26 @@
 class Simulation
 {
 public:
-	int count = 0;
-	int maxParticles = 65536;
-	bool isRunning = false;
-	bool isValid = false;
+	static int count;
+	static int maxParticles;
+	static bool isRunning;
+	static bool isValid;
 
-	float4* particles;
-	float3* velocities;
-	int* activeIndices;
-	float radius = 1;
-	float deltaTime = 1.f / 60.f;
-	int* phases;
-	NvFlexParams g_params;
-	std::thread thread;
-	void initParams();
-	void startSimulation();
-	void pauseSimulation();
-	void stopSimulation();
-	void setRadius(float r);
-	void addParticle(float4 pos, float3 vel, int phase);
-	void makeCube(float3 center, float3 size, int phase);
+	static float4* particles;
+	static float3* velocities;
+	static int* activeIndices;
+	static float radius;
+	static float deltaTime;
+	static int* phases;
+	static NvFlexParams g_params;
+	static std::thread thread;
+	static void initParams();
+	static void startSimulation();
+	static void pauseSimulation();
+	static void stopSimulation();
+	static void setRadius(float r);
+	static void addParticle(float4 pos, float3 vel, int phase);
+	static void makeCube(float3 center, float3 size, int phase);
 
 	// issue #11
 	Simulation();
