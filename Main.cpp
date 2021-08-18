@@ -79,11 +79,23 @@ LUA_FUNCTION(GWaterMakeWaterCube) {
 
 	return 0;
 }
+
 LUA_FUNCTION(GWaterSetRadius) {
 	if (!sim->isValid) return 0;
 
 	float r = static_cast<float>(LUA->GetNumber(-1));
 	sim->setRadius(r);
+
+	return 0;
+}
+
+LUA_FUNCTION(GWaterUpdateParams) {
+	if (!sim->isValid) return 0;
+
+	sim->g_params.adhesion = LUA->GetNumber(-4);
+	sim->g_params.cohesion = LUA->GetNumber(-3);
+	sim->g_params.vorticityConfinement = LUA->GetNumber(-2);
+	sim->g_params.viscosity = LUA->GetNumber(-1);
 
 	return 0;
 }
@@ -105,6 +117,7 @@ GMOD_MODULE_OPEN() {
 	ADD_GWATER_FUNC(GWaterSpawnParticle, "SpawnParticle");
 	ADD_GWATER_FUNC(GWaterMakeWaterCube, "SpawnCube");
 	ADD_GWATER_FUNC(GWaterSetRadius, "SetRadius");
+	ADD_GWATER_FUNC(GWaterUpdateParams, "UpdateParams");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); // pop _G

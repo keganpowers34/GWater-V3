@@ -32,10 +32,10 @@ void Simulation::initParams() {
 
 	g_params.radius = Simulation::radius;
 	g_params.viscosity = 0.01f;
-	g_params.dynamicFriction = 0.1f;
-	g_params.staticFriction = 0.1f;
-	g_params.particleFriction = 0.1f; // scale friction between particles by default
-	g_params.freeSurfaceDrag = 0.1f;
+	g_params.dynamicFriction = 0.001f;
+	g_params.staticFriction = 0.001f;
+	g_params.particleFriction = 0.001f; // scale friction between particles by default
+	g_params.freeSurfaceDrag = 0.001f;
 	g_params.drag = 0.0f;
 	g_params.lift = 0.0f;
 	g_params.numIterations = 1;
@@ -62,8 +62,8 @@ void Simulation::initParams() {
 	g_params.relaxationMode = eNvFlexRelaxationLocal;
 	g_params.relaxationFactor = 1.0f;
 	g_params.solidPressure = 1.0f;
-	g_params.adhesion = 0.005f;
-	g_params.cohesion = 0.015f;
+	g_params.adhesion = 0.008f;
+	g_params.cohesion = 0.019f;
 	g_params.surfaceTension = 0.0f;
 	g_params.vorticityConfinement = 0.0f;
 	g_params.buoyancy = 1.0f;
@@ -152,7 +152,7 @@ void internalRun(Simulation* sim) {
 
 		// tick
 		NvFlexSetParams(solver, &sim->g_params);
-		NvFlexUpdateSolver(solver, sim->deltaTime * 4.f, 1, false);
+		NvFlexUpdateSolver(solver, sim->deltaTime * 8.f, 1, false);
 
 		// read back (async)
 		NvFlexGetParticles(solver, particleBuffer, NULL);
