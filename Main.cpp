@@ -41,7 +41,8 @@ LUA_FUNCTION(GWaterGetParticleData) {
 	LUA->CreateTable();
 
 	for (int i = 0; i < sim->count; i++) {
-		LUA->PushNumber((double)i + 1); //double cast to avoid C26451 arithmetic overflow
+		LUA->PushNumber(static_cast<double>(i) + 1); //double cast to avoid C26451 arithmetic overflow
+		//add one because lua is 1 indexed
 
 		float4 thisPos = sim->particles[i];
 		Vector gmodPos;

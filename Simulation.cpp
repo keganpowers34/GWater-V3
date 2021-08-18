@@ -152,7 +152,7 @@ void internalRun(Simulation* sim) {
 
 		// tick
 		NvFlexSetParams(solver, &sim->g_params);
-		NvFlexUpdateSolver(solver, sim->deltaTime * 2.f, 1, false);
+		NvFlexUpdateSolver(solver, sim->deltaTime * 3.f, 1, false);
 
 		// read back (async)
 		NvFlexGetParticles(solver, particleBuffer, NULL);
