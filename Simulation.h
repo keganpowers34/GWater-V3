@@ -11,35 +11,19 @@
 #include <functional>
 #include <mutex>
 
-class Simulation
-{
-public:
-	static int count;
-	static int maxParticles;
-	static bool isRunning;
-	static bool isValid;
+extern NvFlexParams sim_params;
+extern float4* simParticles;
+extern float3* simVelocities;
+extern float simRadius;
+extern int simCount;
+extern bool simIsRunning;
+extern bool simIsValid;
 
-	static float4* particles;
-	static float3* velocities;
-	static int* activeIndices;
-	static float radius;
-	static float deltaTime;
-	static int* phases;
-	static NvFlexParams g_params;
-	static std::thread thread;
-	static void initParams();
-	static void startSimulation();
-	static void pauseSimulation();
-	static void stopSimulation();
-	static void setRadius(float r);
-	static void addParticle(float4 pos, float3 vel, int phase);
-	static void makeCube(float3 center, float3 size, int phase);
-
-	// issue #11
-	Simulation();
-};
-
-extern Simulation* sim;
+void simAddParticle(float4 pos, float3 vel, int phase);
+void simAddCube(float3 center, float3 size, int phase);
+void simSetRadius(float r);
+void simStopSimulation();
 
 void initSimulation();
+
 

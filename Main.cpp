@@ -14,24 +14,24 @@ LUA_FUNCTION(GWaterInitSim) {
 }
 
 LUA_FUNCTION(GWaterUnpauseSim) {
-	Simulation::isRunning = true;
+	simIsRunning = true;
 	return 0;
 }
 
 LUA_FUNCTION(GWaterPauseSim) {
-	Simulation::isRunning = false;
+	simIsRunning = false;
 	return 0;
 }
 
 LUA_FUNCTION(GWaterDeleteSim) {
-	if (!Simulation::isValid) return 0;
+	if (!simIsValid) return 0;
 
-	Simulation::stopSimulation();
+	simStopSimulation();
 	return 0;
 }
 
 LUA_FUNCTION(GWaterParticleCount) {
-	LUA->PushNumber(Simulation::count);
+	LUA->PushNumber(simCount);
 	return 1;
 }
 
@@ -40,11 +40,11 @@ LUA_FUNCTION(GWaterGetParticleData) {
 
 	LUA->CreateTable();
 
-	for (int i = 0; i < Simulation::count; i++) {
+	for (int i = 0; i < simCount; i++) {
 		LUA->PushNumber(static_cast<double>(i) + 1); //double cast to avoid C26451 arithmetic overflow
 		//add one because lua is 1 indexed
 
-		float4 thisPos = Simulation::particles[i];
+		float4 thisPos = simParticles[i];
 		Vector gmodPos;
 		gmodPos.x = thisPos.x;
 		gmodPos.y = thisPos.y;
@@ -59,43 +59,43 @@ LUA_FUNCTION(GWaterGetParticleData) {
 }
 
 LUA_FUNCTION(GWaterSpawnParticle) {
-	if (!Simulation::isValid) return 0;
+	if (!simIsValid) return 0;
 
 	Vector pos = LUA->GetVector(-2);
 	Vector vel = LUA->GetVector(-1);
 
-	Simulation::addParticle(float4{ pos.x, pos.y, pos.z, 1.f / 2.f }, float3{ vel.x, vel.y, vel.z }, NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid));
+	simAddParticle(float4{ pos.x, pos.y, pos.z, 1.f / 2.f }, float3{ vel.x, vel.y, vel.z }, NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid));
 
 	return 0;
 }
 
 LUA_FUNCTION(GWaterMakeWaterCube) {
-	if (!Simulation::isValid) return 0;
+	if (!simIsValid) return 0;
 
 	Vector center = LUA->GetVector(-2);
 	Vector size = LUA->GetVector(-1);
 
-	Simulation::makeCube(float3{ center.x, center.y, center.z }, float3{ size.x, size.y, size.z }, NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid));
+	simAddCube(float3{ center.x, center.y, center.z }, float3{ size.x, size.y, size.z }, NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid));
 
 	return 0;
 }
 
 LUA_FUNCTION(GWaterSetRadius) {
-	if (!Simulation::isValid) return 0;
+	if (!simIsValid) return 0;
 
 	float r = static_cast<float>(LUA->GetNumber(-1));
-	Simulation::setRadius(r);
+	simSetRadius(r);
 
 	return 0;
 }
 
 LUA_FUNCTION(GWaterUpdateParams) {
-	if (!Simulation::isValid) return 0;
+	if (!simIsValid) return 0;
 
-	Simulation::g_params.adhesion = (float)LUA->GetNumber(-4);
-	Simulation::g_params.cohesion = (float)LUA->GetNumber(-3);
-	Simulation::g_params.vorticityConfinement = (float)LUA->GetNumber(-2);
-	Simulation::g_params.viscosity = (float)LUA->GetNumber(-1);
+	sim_params.adhesion = (float)LUA->GetNumber(-4);
+	sim_params.cohesion = (float)LUA->GetNumber(-3);
+	sim_params.vorticityConfinement = (float)LUA->GetNumber(-2);
+	sim_params.viscosity = (float)LUA->GetNumber(-1);
 
 	return 0;
 }
@@ -130,9 +130,9 @@ GMOD_MODULE_OPEN() {
 
 
 GMOD_MODULE_CLOSE() {
-	Simulation::isValid = false;
-	Simulation::isRunning = false;
-	Simulation::count = 0;
+	simIsValid = false;
+	simIsRunning = false;
+	simCount = 0;
 
 	return 0;
 }

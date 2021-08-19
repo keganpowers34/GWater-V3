@@ -1,21 +1,17 @@
 #include "Simulation.h"
 #include "GarrysMod/Lua/Interface.h"
-#include <sstream>
 
-//extern GarrysMod::Lua::ILuaBase* LUA;
-//extern void PrintLUA(std::string text);
-//extern void printLua(GarrysMod::Lua::ILuaBase* LUA, std::string text);
-//extern void PrintLUA(std::string text);
-
-int Simulation::count = 0;
-int Simulation::maxParticles = 65536;
-bool Simulation::isRunning = false;
-bool Simulation::isValid = false;
-std::thread Simulation::thread = std::thread();
-
-float Simulation::radius = 1;
-float Simulation::deltaTime = 1.f / 60.f;
-
+int simCount = 0;
+int simMaxParticles = 65536;
+bool simIsRunning = false;
+bool simIsValid = false;
+float simRadius = 1.f;
+float simDeltaTime = 1.f / 60.f;
+int* simActiveIndices = nullptr;
+int* simPhases = nullptr;
+float4* simParticles = nullptr;
+float3* simVelocities = nullptr;
+std::thread simThread = std::thread();
 std::mutex* bufferMutex = nullptr;
 
 static NvFlexBuffer* particleBuffer = nullptr;
@@ -23,68 +19,64 @@ static NvFlexBuffer* velocityBuffer = nullptr;
 static NvFlexBuffer* phaseBuffer = nullptr;
 static NvFlexBuffer* activeBuffer = nullptr;
 
-int* Simulation::activeIndices = nullptr;
-int* Simulation::phases = nullptr;
-float4* Simulation::particles = nullptr;
-float3* Simulation::velocities = nullptr;
+NvFlexParams sim_params = NvFlexParams();
 
-NvFlexParams Simulation::g_params = NvFlexParams();
+//for some reason it needs to be in a function, could not understand why
+void simInitParams() {
+	sim_params.gravity[0] = 0.0f;
+	sim_params.gravity[1] = 0.f;
+	sim_params.gravity[2] = -9.8f;		//z is down, not y
 
-void Simulation::initParams() {
-	g_params.gravity[0] = 0.0f;
-	g_params.gravity[1] = 0.f;
-	g_params.gravity[2] = -20.8f;		//z is down, not y
+	sim_params.radius = simRadius;
+	sim_params.viscosity = 0.01f;
+	sim_params.dynamicFriction = 0.001f;
+	sim_params.staticFriction = 0.001f;
+	sim_params.particleFriction = 0.001f; // scale friction between particles by default
+	sim_params.freeSurfaceDrag = 0.001f;
+	sim_params.drag = 0.0f;
+	sim_params.lift = 0.0f;
+	sim_params.numIterations = 1;
+	sim_params.fluidRestDistance = simRadius / 1.5f;
+	sim_params.solidRestDistance = 0.0f;
 
-	g_params.radius = Simulation::radius;
-	g_params.viscosity = 0.01f;
-	g_params.dynamicFriction = 0.001f;
-	g_params.staticFriction = 0.001f;
-	g_params.particleFriction = 0.001f; // scale friction between particles by default
-	g_params.freeSurfaceDrag = 0.001f;
-	g_params.drag = 0.0f;
-	g_params.lift = 0.0f;
-	g_params.numIterations = 1;
-	g_params.fluidRestDistance = Simulation::radius / 1.5f;
-	g_params.solidRestDistance = 0.0f;
+	sim_params.anisotropyScale = 1.0f;
+	sim_params.anisotropyMin = 0.1f;
+	sim_params.anisotropyMax = 2.0f;
+	sim_params.smoothing = 1.0f;
 
-	g_params.anisotropyScale = 1.0f;
-	g_params.anisotropyMin = 0.1f;
-	g_params.anisotropyMax = 2.0f;
-	g_params.smoothing = 1.0f;
+	sim_params.dissipation = 0.0f;
+	sim_params.damping = 0.0f;
+	sim_params.particleCollisionMargin = 0.0f;
+	sim_params.shapeCollisionMargin = 0.0f;
+	sim_params.collisionDistance = 0.0f;
+	sim_params.sleepThreshold = 0.0f;
+	sim_params.shockPropagation = 0.0f;
+	sim_params.restitution = 0.0f;
 
-	g_params.dissipation = 0.0f;
-	g_params.damping = 0.0f;
-	g_params.particleCollisionMargin = 0.0f;
-	g_params.shapeCollisionMargin = 0.0f;
-	g_params.collisionDistance = 0.0f;
-	g_params.sleepThreshold = 0.0f;
-	g_params.shockPropagation = 0.0f;
-	g_params.restitution = 0.0f;
+	sim_params.maxSpeed = FLT_MAX;
+	sim_params.maxAcceleration = 100.0f;	// approximately 10x gravity
 
-	g_params.maxSpeed = FLT_MAX;
-	g_params.maxAcceleration = 100.0f;	// approximately 10x gravity
-
-	g_params.relaxationMode = eNvFlexRelaxationLocal;
-	g_params.relaxationFactor = 1.0f;
-	g_params.solidPressure = 1.0f;
-	g_params.adhesion = 0.008f;
-	g_params.cohesion = 0.019f;
-	g_params.surfaceTension = 0.0f;
-	g_params.vorticityConfinement = 0.0f;
-	g_params.buoyancy = 1.0f;
-	g_params.diffuseThreshold = 100.0f;
-	g_params.diffuseBuoyancy = 1.0f;
-	g_params.diffuseDrag = 0.8f;
-	g_params.diffuseBallistic = 16;
-	g_params.diffuseLifetime = 2.0f;
+	sim_params.relaxationMode = eNvFlexRelaxationLocal;
+	sim_params.relaxationFactor = 1.0f;
+	sim_params.solidPressure = 1.0f;
+	sim_params.adhesion = 0.008f;
+	sim_params.cohesion = 0.019f;
+	sim_params.surfaceTension = 0.0f;
+	sim_params.vorticityConfinement = 0.0f;
+	sim_params.buoyancy = 1.0f;
+	sim_params.diffuseThreshold = 100.0f;
+	sim_params.diffuseBuoyancy = 1.0f;
+	sim_params.diffuseDrag = 0.8f;
+	sim_params.diffuseBallistic = 16;
+	sim_params.diffuseLifetime = 2.0f;
 
 	// planes created after particles
-	g_params.planes[0][0] = 0.f;
-	g_params.planes[0][1] = 0.f;
-	g_params.planes[0][2] = 1.f;
-	g_params.planes[0][3] = 0.f;
+	sim_params.planes[0][0] = 0.f;
+	sim_params.planes[0][1] = 0.f;
+	sim_params.planes[0][2] = 1.f;
+	sim_params.planes[0][3] = 0.f;
 
-	g_params.numPlanes = 1;
+	sim_params.numPlanes = 1;
 };
 
 void internalRun() {
@@ -94,37 +86,37 @@ void internalRun() {
 	// create new solver
 	NvFlexSolverDesc solverDesc;
 	NvFlexSetSolverDescDefaults(&solverDesc);
-	solverDesc.maxParticles = Simulation::maxParticles;
+	solverDesc.maxParticles = simMaxParticles;
 	solverDesc.maxDiffuseParticles = 0;
 
 	NvFlexSolver* solver = NvFlexCreateSolver(library, &solverDesc);
-	NvFlexSetParams(solver, &Simulation::g_params);
+	NvFlexSetParams(solver, &sim_params);
 
 	//alocate our buffers to memory
-	particleBuffer = NvFlexAllocBuffer(library, Simulation::maxParticles, sizeof(float4), eNvFlexBufferHost);
-	velocityBuffer = NvFlexAllocBuffer(library, Simulation::maxParticles, sizeof(float3), eNvFlexBufferHost);
-	phaseBuffer = NvFlexAllocBuffer(library, Simulation::maxParticles, sizeof(int), eNvFlexBufferHost);
-	activeBuffer = NvFlexAllocBuffer(library, Simulation::maxParticles, sizeof(int), eNvFlexBufferHost);
+	particleBuffer = NvFlexAllocBuffer(library, simMaxParticles, sizeof(float4), eNvFlexBufferHost);
+	velocityBuffer = NvFlexAllocBuffer(library, simMaxParticles, sizeof(float3), eNvFlexBufferHost);
+	phaseBuffer = NvFlexAllocBuffer(library, simMaxParticles, sizeof(int), eNvFlexBufferHost);
+	activeBuffer = NvFlexAllocBuffer(library, simMaxParticles, sizeof(int), eNvFlexBufferHost);
 
 	//allocates how big the array of stuff is
-	Simulation::particles = (float4*)malloc(sizeof(float4) * Simulation::maxParticles);
-	Simulation::velocities = (float3*)malloc(sizeof(float3) * Simulation::maxParticles);
-	Simulation::phases = (int*)malloc(sizeof(int) * Simulation::maxParticles);
-	Simulation::activeIndices = (int*)malloc(sizeof(int) * Simulation::maxParticles);
+	simParticles = (float4*)malloc(sizeof(float4) * simMaxParticles);
+	simVelocities = (float3*)malloc(sizeof(float3) * simMaxParticles);
+	simPhases = (int*)malloc(sizeof(int) * simMaxParticles);
+	simActiveIndices = (int*)malloc(sizeof(int) * simMaxParticles);
 
 	bufferMutex = new std::mutex();
 
-	while (Simulation::isValid) {
+	while (simIsValid) {
 
-		std::this_thread::sleep_for(std::chrono::duration<float>(Simulation::deltaTime));
+		std::this_thread::sleep_for(std::chrono::duration<float>(simDeltaTime));
 
-		if (!Simulation::isRunning) continue;
-		if (Simulation::count < 1) continue;
+		if (!simIsRunning) continue;
+		if (simCount < 1) continue;
 
 		//lock mutex
 		bufferMutex->lock();
 
-		if (!Simulation::isValid) {
+		if (!simIsValid) {
 			bufferMutex->unlock();
 			break;
 		}
@@ -137,8 +129,8 @@ void internalRun() {
 
 		//do rendering here
 
-		if (Simulation::particles)
-			memcpy(Simulation::particles, particles, sizeof(float4) * Simulation::maxParticles);
+		if (simParticles)
+			memcpy(simParticles, particles, sizeof(float4) * simMaxParticles);
 		else {
 			printf("Simulation::particles was NULL");
 		}
@@ -153,11 +145,11 @@ void internalRun() {
 		NvFlexSetVelocities(solver, velocityBuffer, NULL);
 		NvFlexSetPhases(solver, phaseBuffer, NULL);
 		NvFlexSetActive(solver, activeBuffer, NULL);
-		NvFlexSetActiveCount(solver, Simulation::count);
+		NvFlexSetActiveCount(solver, simCount);
 
 		// tick
-		NvFlexSetParams(solver, &Simulation::g_params);
-		NvFlexUpdateSolver(solver, Simulation::deltaTime * 8.f, 1, false);
+		NvFlexSetParams(solver, &sim_params);
+		NvFlexUpdateSolver(solver, simDeltaTime * 8.f, 1, false);
 
 		// read back (async)
 		NvFlexGetParticles(solver, particleBuffer, NULL);
@@ -178,37 +170,30 @@ void internalRun() {
 }
 
 void initSimulation(){
-	if (Simulation::isValid) return;
+	if (simIsValid) return;
 
-	Simulation::thread = std::thread(internalRun);
-	Simulation::thread.detach();
+	simInitParams();
+	simThread = std::thread(internalRun);
+	simThread.detach();
 
-	Simulation::isValid = true;
+	simIsValid = true;
 }
 
-void Simulation::startSimulation(){
-	isRunning = true;
+void simStopSimulation(){
+	simIsValid = false;
+	simIsRunning = false;
+	simCount = 0;
 }
 
-void Simulation::pauseSimulation(){
-	isRunning = false;
-}
-
-void Simulation::stopSimulation(){
-	isValid = false;
-	isRunning = false;
-	count = 0;
-}
-
-void Simulation::setRadius(float r) {
-	radius = r;
-	g_params.radius = r;
-	g_params.fluidRestDistance = r / 1.5f;
+void simSetRadius(float r) {
+	simRadius = r;
+	sim_params.radius = r;
+	sim_params.fluidRestDistance = r / 1.5f;
 
 }
 
-void Simulation::addParticle(float4 pos, float3 vel, int phase) {
-	if (!Simulation::isValid) {
+void simAddParticle(float4 pos, float3 vel, int phase) {
+	if (!simIsValid) {
 		return;
 	};
 
@@ -226,11 +211,11 @@ void Simulation::addParticle(float4 pos, float3 vel, int phase) {
 		return;
 	};
 
-	particles[Simulation::count] = pos;
-	velocities[Simulation::count] = vel;
-	phases[Simulation::count] = phase;
-	activeIndices[Simulation::count] = Simulation::count;
-	Simulation::count++;
+	particles[simCount] = pos;
+	velocities[simCount] = vel;
+	phases[simCount] = phase;
+	activeIndices[simCount] = simCount;
+	simCount++;
 
 	NvFlexUnmap(particleBuffer);
 	NvFlexUnmap(velocityBuffer);
@@ -240,8 +225,8 @@ void Simulation::addParticle(float4 pos, float3 vel, int phase) {
 	bufferMutex->unlock();
 }
 
-void Simulation::makeCube(float3 center, float3 size, int phase) {
-	if (!Simulation::isValid || !bufferMutex) {
+void simAddCube(float3 center, float3 size, int phase) {
+	if (!simIsValid || !bufferMutex) {
 		return;
 	};
 
@@ -261,23 +246,19 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 	for (float z = -size.z / 2; z <= size.z / 2; z++) {
 		for (float y = -size.y / 2; y <= size.y / 2; y++) {
 			for (float x = -size.x / 2; x <= size.x / 2; x++) {
-				//shitter moment, it appears you are out of particles
-				if (Simulation::count >= Simulation::maxParticles) {
+				//it appears you are out of particles
+				if (simCount >= simMaxParticles) {
 					bufferMutex->unlock();
 					return;
 				}
 
-				float4 pos = float4{ center.x + x * radius, center.y + y * radius, center.z + z * radius, 1.f / 2.f };
-				particles[Simulation::count] = pos;
-				velocities[Simulation::count] = float3{0.f, 0.f, 0.f};
-				phases[Simulation::count] = phase;
-				activeIndices[Simulation::count] = Simulation::count;
+				float4 pos = float4{ center.x + x * simRadius, center.y + y * simRadius, center.z + z * simRadius, 1.f / 2.f };
+				particles[simCount] = pos;
+				velocities[simCount] = float3{0.f, 0.f, 0.f};
+				phases[simCount] = phase;
+				activeIndices[simCount] = simCount;
+				simCount++;
 
-				//if only cpp had string + number + string + etc
-				//std::stringstream str;
-				//str << Simulation::count << ": " << pos.x << "," << pos.y << "," << pos.z;
-				//PrintLUA(str.str());
-				Simulation::count++;
 			}
 		}
 	}
@@ -289,9 +270,3 @@ void Simulation::makeCube(float3 center, float3 size, int phase) {
 
 	bufferMutex->unlock();
 }
-
-Simulation::Simulation()
-{
-	initParams();
-}
-
