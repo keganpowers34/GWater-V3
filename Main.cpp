@@ -1,5 +1,3 @@
-#include "GarrysMod/Lua/Interface.h"
-#include "GarrysMod/Lua/SourceCompat.h"
 #include "types.h"
 #include "Simulation.h"
 
@@ -100,10 +98,73 @@ LUA_FUNCTION(GWaterUpdateParams) {
 	return 0;
 }
 
+LUA_FUNCTION(AddWorldMesh) {
+
+	LUA->CheckType(-3, Type::Vector); // Max
+	LUA->CheckType(-2, Type::Vector); // Min
+	LUA->CheckType(-1, Type::Table); // Sorted verts
+
+	size_t tableLen = LUA->ObjLen();
+	NvFlexBuffer* worldVerts = NvFlexAllocBuffer(flex_library, tableLen, sizeof(float4), eNvFlexBufferHost);
+	NvFlexBuffer* worldIndices = NvFlexAllocBuffer(flex_library, tableLen, sizeof(int), eNvFlexBufferHost);
+
+	float4* hostVerts = (float4*)NvFlexMap(worldVerts, eNvFlexMapWait);
+	int* hostIndices = (int*)NvFlexMap(worldIndices, eNvFlexMapWait);
+
+	for (int i = 0; i < tableLen; i++) {
+		float4 vert;
+
+		// Push our target index to the stack.
+		//add 1 because lua is 1 indexed
+		LUA->PushNumber(i + 1);
+		// Get the table data at this index (and not get the table, which is what I thought this did.)
+		LUA->GetTable(-2);
+		// Check for the sentinel nil element.
+		if (LUA->GetType(-1) == Type::Nil) break;
+
+		Vector thisPos = LUA->GetVector();
+		vert.x = thisPos.x;
+		vert.y = thisPos.y;
+		vert.z = thisPos.z;
+		vert.w = 1.f / 2.f;
+
+		hostVerts[i] = vert;
+		hostIndices[i] = i;
+
+		// Pop it off again.
+		LUA->Pop(1);
+	}
+
+	// Pop off the nil
+
+	LUA->Pop();
+
+	// Ok, we're done, lets get our mesh id (and our min max)
+
+	NvFlexUnmap(worldVerts);
+	NvFlexUnmap(worldIndices);
+
+	worldMeshId = NvFlexCreateTriangleMesh(flex_library);
+
+	Vector minV = LUA->GetVector(-1);
+	Vector maxV = LUA->GetVector(-2);
+
+	float minFloat[3] = { minV.x, minV.y, minV.z };
+	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
+
+	NvFlexUpdateTriangleMesh(flex_library, worldMeshId, worldVerts, worldIndices, tableLen, tableLen / 3, minFloat, maxFloat);
+
+	//map world collider
+	simAddWorld();
+
+	return 0;
+}
+
 
 
 GMOD_MODULE_OPEN() {
 	printf("gWater v1.5");
+	GlobalLUA = LUA;
 	// push ALL c -> lua functions
 	LUA->PushSpecial(SPECIAL_GLOB); //push _G
 
@@ -118,6 +179,7 @@ GMOD_MODULE_OPEN() {
 	ADD_GWATER_FUNC(GWaterMakeWaterCube, "SpawnCube");
 	ADD_GWATER_FUNC(GWaterSetRadius, "SetRadius");
 	ADD_GWATER_FUNC(GWaterUpdateParams, "UpdateParams");
+	ADD_GWATER_FUNC(AddWorldMesh, "AddWorldMesh");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); // pop _G

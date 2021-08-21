@@ -1,5 +1,6 @@
 #include "Simulation.h"
-#include "GarrysMod/Lua/Interface.h"
+
+GarrysMod::Lua::ILuaBase* GlobalLUA = nullptr;
 
 int simCount = 0;
 int simMaxParticles = 65536;
@@ -18,10 +19,31 @@ static NvFlexBuffer* particleBuffer = nullptr;
 static NvFlexBuffer* velocityBuffer = nullptr;
 static NvFlexBuffer* phaseBuffer = nullptr;
 static NvFlexBuffer* activeBuffer = nullptr;
+static NvFlexBuffer* geometryBuffer = nullptr;
+static NvFlexBuffer* geoFlagsBuffer = nullptr;
+static NvFlexBuffer* geoPosBuffer = nullptr;
+static NvFlexBuffer* geoQuatBuffer = nullptr;
+static NvFlexBuffer* worldVerts = nullptr;
+static NvFlexBuffer* worldIndices = nullptr;
 
+
+NvFlexLibrary* flex_library = nullptr;
+NvFlexTriangleMeshId worldMeshId = NULL;
 NvFlexParams sim_params = NvFlexParams();
 
-//for some reason it needs to be in a function, could not understand why
+//max function from potatoos
+#define max(a, b) a > b ? a : b
+
+void printLua(GarrysMod::Lua::ILuaBase* LUA, std::string text)
+{
+	LUA->PushSpecial(GarrysMod::Lua::SPECIAL_GLOB);
+	LUA->GetField(-1, "print");
+	LUA->PushString(text.c_str());
+	LUA->Call(1, 0);
+	LUA->Pop();
+}
+
+//for some reason params needs to be in a function
 void simInitParams() {
 	sim_params.gravity[0] = 0.0f;
 	sim_params.gravity[1] = 0.f;
@@ -35,9 +57,9 @@ void simInitParams() {
 	sim_params.freeSurfaceDrag = 0.001f;
 	sim_params.drag = 0.0f;
 	sim_params.lift = 0.0f;
-	sim_params.numIterations = 1;
+	sim_params.numIterations = 3;
 	sim_params.fluidRestDistance = simRadius / 1.5f;
-	sim_params.solidRestDistance = 0.0f;
+	sim_params.solidRestDistance = simRadius;
 
 	sim_params.anisotropyScale = 1.0f;
 	sim_params.anisotropyMin = 0.1f;
@@ -48,7 +70,7 @@ void simInitParams() {
 	sim_params.damping = 0.0f;
 	sim_params.particleCollisionMargin = 0.0f;
 	sim_params.shapeCollisionMargin = 0.0f;
-	sim_params.collisionDistance = 0.0f;
+	sim_params.collisionDistance = simRadius;
 	sim_params.sleepThreshold = 0.0f;
 	sim_params.shockPropagation = 0.0f;
 	sim_params.restitution = 0.0f;
@@ -71,17 +93,19 @@ void simInitParams() {
 	sim_params.diffuseLifetime = 2.0f;
 
 	// planes created after particles
-	sim_params.planes[0][0] = 0.f;
-	sim_params.planes[0][1] = 0.f;
-	sim_params.planes[0][2] = 1.f;
-	sim_params.planes[0][3] = 0.f;
+	//sim_params.planes[0][0] = 0.f;
+	//sim_params.planes[0][1] = 0.f;
+	//sim_params.planes[0][2] = 1.f;
+	//sim_params.planes[0][3] = 11135.5f;
 
-	sim_params.numPlanes = 1;
+	sim_params.numPlanes = 0;
 };
 
 void internalRun() {
 
-	NvFlexLibrary* library = NvFlexInit();
+	bufferMutex->lock();
+	//init library
+	flex_library = NvFlexInit();
 
 	// create new solver
 	NvFlexSolverDesc solverDesc;
@@ -89,14 +113,14 @@ void internalRun() {
 	solverDesc.maxParticles = simMaxParticles;
 	solverDesc.maxDiffuseParticles = 0;
 
-	NvFlexSolver* solver = NvFlexCreateSolver(library, &solverDesc);
+	NvFlexSolver* solver = NvFlexCreateSolver(flex_library, &solverDesc);
 	NvFlexSetParams(solver, &sim_params);
 
-	//alocate our buffers to memory
-	particleBuffer = NvFlexAllocBuffer(library, simMaxParticles, sizeof(float4), eNvFlexBufferHost);
-	velocityBuffer = NvFlexAllocBuffer(library, simMaxParticles, sizeof(float3), eNvFlexBufferHost);
-	phaseBuffer = NvFlexAllocBuffer(library, simMaxParticles, sizeof(int), eNvFlexBufferHost);
-	activeBuffer = NvFlexAllocBuffer(library, simMaxParticles, sizeof(int), eNvFlexBufferHost);
+	//alocate all our buffers to memory
+	particleBuffer = NvFlexAllocBuffer(flex_library, simMaxParticles, sizeof(float4), eNvFlexBufferHost);
+	velocityBuffer = NvFlexAllocBuffer(flex_library, simMaxParticles, sizeof(float3), eNvFlexBufferHost);
+	phaseBuffer = NvFlexAllocBuffer(flex_library, simMaxParticles, sizeof(int), eNvFlexBufferHost);
+	activeBuffer = NvFlexAllocBuffer(flex_library, simMaxParticles, sizeof(int), eNvFlexBufferHost);
 
 	//allocates how big the array of stuff is
 	simParticles = (float4*)malloc(sizeof(float4) * simMaxParticles);
@@ -104,7 +128,7 @@ void internalRun() {
 	simPhases = (int*)malloc(sizeof(int) * simMaxParticles);
 	simActiveIndices = (int*)malloc(sizeof(int) * simMaxParticles);
 
-	bufferMutex = new std::mutex();
+	bufferMutex->unlock();
 
 	while (simIsValid) {
 
@@ -120,7 +144,6 @@ void internalRun() {
 			bufferMutex->unlock();
 			break;
 		}
-	
 
 		float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
 		float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
@@ -146,6 +169,7 @@ void internalRun() {
 		NvFlexSetPhases(solver, phaseBuffer, NULL);
 		NvFlexSetActive(solver, activeBuffer, NULL);
 		NvFlexSetActiveCount(solver, simCount);
+		NvFlexSetShapes(solver, geometryBuffer, geoPosBuffer, geoQuatBuffer, NULL, NULL, geoFlagsBuffer, 1);
 
 		// tick
 		NvFlexSetParams(solver, &sim_params);
@@ -164,19 +188,27 @@ void internalRun() {
 	NvFlexFreeBuffer(velocityBuffer);
 	NvFlexFreeBuffer(phaseBuffer);
 	NvFlexFreeBuffer(activeBuffer);
+	NvFlexFreeBuffer(worldVerts);
+	NvFlexFreeBuffer(worldIndices);
+
+	NvFlexDestroyTriangleMesh(flex_library, worldMeshId);
 
 	NvFlexDestroySolver(solver);
-	NvFlexShutdown(library);
+	NvFlexShutdown(flex_library);
 }
 
 void initSimulation(){
 	if (simIsValid) return;
 
+	bufferMutex = new std::mutex();
+	//bufferMutex->lock();
+
 	simInitParams();
 	simThread = std::thread(internalRun);
 	simThread.detach();
-
 	simIsValid = true;
+
+	//bufferMutex->unlock();
 }
 
 void simStopSimulation(){
@@ -189,9 +221,11 @@ void simSetRadius(float r) {
 	simRadius = r;
 	sim_params.radius = r;
 	sim_params.fluidRestDistance = r / 1.5f;
+	sim_params.solidRestDistance = r / 1.5f;
 
 }
 
+//adds a singular particle
 void simAddParticle(float4 pos, float3 vel, int phase) {
 	if (!simIsValid) {
 		return;
@@ -225,6 +259,7 @@ void simAddParticle(float4 pos, float3 vel, int phase) {
 	bufferMutex->unlock();
 }
 
+//adds a cube of particles with a set size
 void simAddCube(float3 center, float3 size, int phase) {
 	if (!simIsValid || !bufferMutex) {
 		return;
@@ -269,4 +304,32 @@ void simAddCube(float3 center, float3 size, int phase) {
 	NvFlexUnmap(activeBuffer);
 
 	bufferMutex->unlock();
+}
+
+//adds world collisions when called
+void simAddWorld() {
+	geometryBuffer = NvFlexAllocBuffer(flex_library, simMaxParticles, sizeof(NvFlexCollisionGeometry), eNvFlexBufferHost);
+	geoPosBuffer = NvFlexAllocBuffer(flex_library, simMaxParticles, sizeof(float4), eNvFlexBufferHost);
+	geoFlagsBuffer = NvFlexAllocBuffer(flex_library, simMaxParticles, sizeof(int), eNvFlexBufferHost);
+	geoQuatBuffer = NvFlexAllocBuffer(flex_library, simMaxParticles, sizeof(float4), eNvFlexBufferHost);
+
+	NvFlexCollisionGeometry* geometry = (NvFlexCollisionGeometry*)NvFlexMap(geometryBuffer, 0);
+	float4* positions = (float4*)NvFlexMap(geoPosBuffer, 0);
+	float4* rotations = (float4*)NvFlexMap(geoQuatBuffer, 0);
+	int* flags = (int*)NvFlexMap(geoFlagsBuffer, 0);
+
+	flags[0] = NvFlexMakeShapeFlags(eNvFlexShapeTriangleMesh, false);
+	geometry[0].triMesh.mesh = worldMeshId;
+	geometry[0].triMesh.scale[0] = 1.0f;
+	geometry[0].triMesh.scale[1] = 1.0f;
+	geometry[0].triMesh.scale[2] = 1.0f;
+
+	positions[0] = float4{ 0.f, 0.f, 0.f, 0.f };
+	rotations[0] = float4{ 0.f, 0.f, 0.f, 0.f };
+
+	NvFlexUnmap(geometryBuffer);
+	NvFlexUnmap(geoPosBuffer);
+	NvFlexUnmap(geoQuatBuffer);
+	NvFlexUnmap(geoFlagsBuffer);
+
 }
