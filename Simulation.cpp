@@ -57,9 +57,9 @@ void simInitParams() {
 	sim_params.freeSurfaceDrag = 0.001f;
 	sim_params.drag = 0.0f;
 	sim_params.lift = 0.0f;
-	sim_params.numIterations = 3;
+	sim_params.numIterations = 2;
 	sim_params.fluidRestDistance = simRadius / 1.5f;
-	sim_params.solidRestDistance = simRadius;
+	sim_params.solidRestDistance = 0.f;
 
 	sim_params.anisotropyScale = 1.0f;
 	sim_params.anisotropyMin = 0.1f;
@@ -69,8 +69,8 @@ void simInitParams() {
 	sim_params.dissipation = 0.0f;
 	sim_params.damping = 0.0f;
 	sim_params.particleCollisionMargin = 0.0f;
-	sim_params.shapeCollisionMargin = 0.0f;
-	sim_params.collisionDistance = simRadius;
+	sim_params.shapeCollisionMargin = 0.f;
+	sim_params.collisionDistance = 9999.f;
 	sim_params.sleepThreshold = 0.0f;
 	sim_params.shockPropagation = 0.0f;
 	sim_params.restitution = 0.0f;
@@ -173,7 +173,7 @@ void internalRun() {
 
 		// tick
 		NvFlexSetParams(solver, &sim_params);
-		NvFlexUpdateSolver(solver, simDeltaTime * 8.f, 1, false);
+		NvFlexUpdateSolver(solver, simDeltaTime * 8.f, 2, false);
 
 		// read back (async)
 		NvFlexGetParticles(solver, particleBuffer, NULL);
@@ -324,8 +324,10 @@ void simAddWorld() {
 	geometry[0].triMesh.scale[1] = 1.0f;
 	geometry[0].triMesh.scale[2] = 1.0f;
 
-	positions[0] = float4{ 0.f, 0.f, 0.f, 0.f };
-	rotations[0] = float4{ 0.f, 0.f, 0.f, 0.f };
+	positions[0] = float4{ };
+	rotations[0] = float4{ };
+
+	printLua(GlobalLUA, "Uploading World Mesh..");
 
 	NvFlexUnmap(geometryBuffer);
 	NvFlexUnmap(geoPosBuffer);

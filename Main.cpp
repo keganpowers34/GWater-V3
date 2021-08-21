@@ -120,13 +120,16 @@ LUA_FUNCTION(AddWorldMesh) {
 		// Get the table data at this index (and not get the table, which is what I thought this did.)
 		LUA->GetTable(-2);
 		// Check for the sentinel nil element.
-		if (LUA->GetType(-1) == Type::Nil) break;
+		if (LUA->GetType(-1) == Type::Nil) {
+			printLua(GlobalLUA, "Invalid Mesh!");
+			break;
+		}
 
 		Vector thisPos = LUA->GetVector();
 		vert.x = thisPos.x;
 		vert.y = thisPos.y;
 		vert.z = thisPos.z;
-		vert.w = 1.f / 2.f;
+		vert.w = 0.f;
 
 		hostVerts[i] = vert;
 		hostIndices[i] = i;
