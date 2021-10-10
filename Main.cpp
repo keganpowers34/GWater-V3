@@ -1,48 +1,96 @@
-#include "types.h"
-#include "Simulation.h"
+#include "declarations.h"
+#include <string>
 
 using namespace GarrysMod::Lua;
 
-//potato forced me to add this
-#define ADD_GWATER_FUNC(funcName, tblName) LUA->PushCFunction(funcName); LUA->SetField(-2, tblName);
-
-LUA_FUNCTION(GWaterInitSim) {
-	initSimulation();
-	return 0;
+//overloaded printlua func
+void printLua(std::string text)
+{
+	GlobalLUA->PushSpecial(SPECIAL_GLOB);
+	GlobalLUA->GetField(-1, "print");
+	GlobalLUA->PushString(text.c_str());
+	GlobalLUA->Call(1, 0);
+	GlobalLUA->Pop();
+}
+void printLua(char* text)
+{
+	GlobalLUA->PushSpecial(SPECIAL_GLOB);
+	GlobalLUA->GetField(-1, "print");
+	GlobalLUA->PushString(text);
+	GlobalLUA->Call(1, 0);
+	GlobalLUA->Pop();
 }
 
-LUA_FUNCTION(GWaterUnpauseSim) {
-	simIsRunning = true;
-	return 0;
+
+
+//potato code
+void gjelly_error(NvFlexErrorSeverity type, const char* msg, const char* file, int line) {
+	printLua("OH NO, FLEX ERROR!!!");
+	printLua(file);
+	printLua(std::to_string(line));
+	//printLua(std::to_string(type));
+	printLua(msg);
 }
 
-LUA_FUNCTION(GWaterPauseSim) {
-	simIsRunning = false;
-	return 0;
+void shutdownGWater() {
+	simValid = false;
+
+	GlobalLUA->PushSpecial(SPECIAL_GLOB);
+	GlobalLUA->PushNil();
+	GlobalLUA->SetField(-2, "gwater"); // Simply set the gjelly table to nil
+	GlobalLUA->Pop(); // Pop off the global env
+
+	if (flexLibrary != nullptr) {
+		bufferMutex->lock();
+
+		// yeesh, to-do: make buffers fall inside a map (maybe?)
+		/*NvFlexFreeBuffer(particleBuffer);
+		NvFlexFreeBuffer(velocityBuffer);
+		NvFlexFreeBuffer(phaseBuffer);
+		NvFlexFreeBuffer(activeBuffer);
+		NvFlexFreeBuffer(lengthsBuffer);
+		NvFlexFreeBuffer(indicesBuffer);
+		NvFlexFreeBuffer(coefficientsBuffer);
+		NvFlexFreeBuffer(geometryBuffer);
+		NvFlexFreeBuffer(geoPosBuffer);
+		NvFlexFreeBuffer(geoQuatBuffer);
+		NvFlexFreeBuffer(geoFlagsBuffer);*/
+
+		/*for (Prop thisProp : props) {
+			NvFlexFreeBuffer(thisProp.verts);
+			NvFlexFreeBuffer(thisProp.indices);
+
+			NvFlexDestroyTriangleMesh(flexLib, thisProp.meshId);
+		}*/
+
+		NvFlexDestroySolver(flexSolver);
+		NvFlexShutdown(flexLibrary);
+
+		delete flexParams;
+		delete bufferMutex;
+
+		free(particleBufferHost);
+
+		flexLibrary = nullptr;
+
+		bufferMutex->unlock();
+
+	}
+
+
 }
 
-LUA_FUNCTION(GWaterDeleteSim) {
-	if (!simIsValid) return 0;
+#define ADD_GWATER_FUNC(funcName, tblName) GlobalLUA->PushCFunction(funcName); GlobalLUA->SetField(-2, tblName);
 
-	simStopSimulation();
-	return 0;
-}
 
-LUA_FUNCTION(GWaterParticleCount) {
-	LUA->PushNumber(simCount);
-	return 1;
-}
-
-//potatoos function
-LUA_FUNCTION(GWaterGetParticleData) {
-
+LUA_FUNCTION(GetData) {
+	// Returns a table with all of the particles
 	LUA->CreateTable();
+	//printLua(std::to_string(numParticles));
+	for (int i = 0; i < numParticles; i++) {
+		LUA->PushNumber(i + 1);
 
-	for (int i = 0; i < simCount; i++) {
-		LUA->PushNumber(static_cast<double>(i) + 1); //double cast to avoid C26451 arithmetic overflow
-		//add one because lua is 1 indexed
-
-		float4 thisPos = simParticles[i];
+		float4 thisPos = particleBufferHost[i];
 		Vector gmodPos;
 		gmodPos.x = thisPos.x;
 		gmodPos.y = thisPos.y;
@@ -53,51 +101,16 @@ LUA_FUNCTION(GWaterGetParticleData) {
 	}
 
 	return 1;
-
 }
 
-LUA_FUNCTION(GWaterSpawnParticle) {
-	if (!simIsValid) return 0;
-
-	Vector pos = LUA->GetVector(-2);
-	Vector vel = LUA->GetVector(-1);
-
-	simAddParticle(float4{ pos.x, pos.y, pos.z, 1.f / 2.f }, float3{ vel.x, vel.y, vel.z }, NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid));
+//stops simulation
+LUA_FUNCTION(DeleteSimulation) {
+	shutdownGWater();
 
 	return 0;
 }
 
-LUA_FUNCTION(GWaterMakeWaterCube) {
-	if (!simIsValid) return 0;
-
-	Vector center = LUA->GetVector(-2);
-	Vector size = LUA->GetVector(-1);
-
-	simAddCube(float3{ center.x, center.y, center.z }, float3{ size.x, size.y, size.z }, NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid));
-
-	return 0;
-}
-
-LUA_FUNCTION(GWaterSetRadius) {
-	if (!simIsValid) return 0;
-
-	float r = static_cast<float>(LUA->GetNumber(-1));
-	simSetRadius(r);
-
-	return 0;
-}
-
-LUA_FUNCTION(GWaterUpdateParams) {
-	if (!simIsValid) return 0;
-
-	sim_params.adhesion = (float)LUA->GetNumber(-4);
-	sim_params.cohesion = (float)LUA->GetNumber(-3);
-	sim_params.vorticityConfinement = (float)LUA->GetNumber(-2);
-	sim_params.viscosity = (float)LUA->GetNumber(-1);
-
-	return 0;
-}
-
+//the world mesh
 LUA_FUNCTION(AddWorldMesh) {
 
 	LUA->CheckType(-3, Type::Vector); // Max
@@ -105,99 +118,136 @@ LUA_FUNCTION(AddWorldMesh) {
 	LUA->CheckType(-1, Type::Table); // Sorted verts
 
 	size_t tableLen = LUA->ObjLen();
-	NvFlexBuffer* worldVerts = NvFlexAllocBuffer(flex_library, tableLen, sizeof(float4), eNvFlexBufferHost);
-	NvFlexBuffer* worldIndices = NvFlexAllocBuffer(flex_library, tableLen, sizeof(int), eNvFlexBufferHost);
+	printLua(std::to_string(tableLen));
+	NvFlexBuffer* worldVerts = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(float4), eNvFlexBufferHost);
+	NvFlexBuffer* worldIndices = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(int), eNvFlexBufferHost);
 
 	float4* hostVerts = (float4*)NvFlexMap(worldVerts, eNvFlexMapWait);
 	int* hostIndices = (int*)NvFlexMap(worldIndices, eNvFlexMapWait);
 
 	for (int i = 0; i < tableLen; i++) {
+		int actualIndex = i + 1;
 		float4 vert;
 
 		// Push our target index to the stack.
-		//add 1 because lua is 1 indexed
-		LUA->PushNumber(i + 1);
+		LUA->PushNumber(actualIndex);
 		// Get the table data at this index (and not get the table, which is what I thought this did.)
 		LUA->GetTable(-2);
 		// Check for the sentinel nil element.
-		if (LUA->GetType(-1) == Type::Nil) {
-			printLua(GlobalLUA, "Invalid Mesh!");
-			break;
-		}
-
+		if (LUA->GetType(-1) == GarrysMod::Lua::Type::Nil) break;
+		// Get it's value.
 		Vector thisPos = LUA->GetVector();
-		vert.x = thisPos.x;
-		vert.y = thisPos.y;
-		vert.z = thisPos.z;
-		vert.w = 0.f;
+		vert.x = thisPos.x*10;
+		vert.y = thisPos.y*10;
+		vert.z = thisPos.z*10;
+		vert.w = 1.f / 2.f;
+
+		printLua(std::to_string(vert.x) + "," + std::to_string(vert.y) + "," + std::to_string(vert.z));
 
 		hostVerts[i] = vert;
 		hostIndices[i] = i;
+
+		// CCW -> CW triangle winding
+		if (i % 2 == 0) {
+			hostIndices[i - 1], hostIndices[i] = hostIndices[i], hostIndices[i - 1];
+		}
 
 		// Pop it off again.
 		LUA->Pop(1);
 	}
 
 	// Pop off the nil
-
 	LUA->Pop();
 
 	// Ok, we're done, lets get our mesh id (and our min max)
-
 	NvFlexUnmap(worldVerts);
 	NvFlexUnmap(worldIndices);
 
-	worldMeshId = NvFlexCreateTriangleMesh(flex_library);
-
-	Vector minV = LUA->GetVector(-1);
+	Vector minV = LUA->GetVector();
 	Vector maxV = LUA->GetVector(-2);
 
 	float minFloat[3] = { minV.x, minV.y, minV.z };
 	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
 
-	NvFlexUpdateTriangleMesh(flex_library, worldMeshId, worldVerts, worldIndices, tableLen, tableLen / 3, minFloat, maxFloat);
+	NvFlexTriangleMeshId worldMeshID = NvFlexCreateTriangleMesh(flexLibrary);
 
-	//map world collider
-	simAddWorld();
+	NvFlexUpdateTriangleMesh(flexLibrary, worldMeshID, worldVerts, worldIndices, tableLen, tableLen / 3, minFloat, maxFloat);
 
+	propCount++;
+
+	//LUA->PushNumber(static_cast<double>(tableLen)); // The ID to the collider
 	return 0;
 }
 
-
-
-GMOD_MODULE_OPEN() {
-	printf("gWater v1.5");
+GMOD_MODULE_OPEN()
+{
 	GlobalLUA = LUA;
-	// push ALL c -> lua functions
-	LUA->PushSpecial(SPECIAL_GLOB); //push _G
+	//FILE* pFile = nullptr;
+
+	//freopen_s(&pFile, "CONOUT$", "w", stdout); // cursed way to redirect stdout to our own console
+	LUA->PushSpecial(SPECIAL_GLOB);
 
 	LUA->CreateTable();
-
-	ADD_GWATER_FUNC(GWaterInitSim, "Initialize");
-	ADD_GWATER_FUNC(GWaterUnpauseSim, "Unpause");
-	ADD_GWATER_FUNC(GWaterPauseSim, "Pause");
-	ADD_GWATER_FUNC(GWaterDeleteSim, "DeleteSimulation");
-	ADD_GWATER_FUNC(GWaterGetParticleData, "GetData");
-	ADD_GWATER_FUNC(GWaterSpawnParticle, "SpawnParticle");
-	ADD_GWATER_FUNC(GWaterMakeWaterCube, "SpawnCube");
-	ADD_GWATER_FUNC(GWaterSetRadius, "SetRadius");
-	ADD_GWATER_FUNC(GWaterUpdateParams, "UpdateParams");
+	ADD_GWATER_FUNC(GetData, "GetData");
+	ADD_GWATER_FUNC(DeleteSimulation, "DeleteSimulation");
 	ADD_GWATER_FUNC(AddWorldMesh, "AddWorldMesh");
+	//ADD_GWATER_FUNC(SetColliderPos, "SetColliderPos");
+	//ADD_GWATER_FUNC(SetColliderQuat, "SetColliderQuat");
 
 	LUA->SetField(-2, "gwater");
-	LUA->Pop(); // pop _G
+	LUA->Pop(); // Remove global env
 
+	// Initialize FleX
+	flexLibrary = NvFlexInit(120, gjelly_error);
 
-	
+	NvFlexSolverDesc solverDesc;
+	NvFlexSetSolverDescDefaults(&solverDesc);
+	solverDesc.maxParticles = 65536;
+	solverDesc.maxDiffuseParticles = 0;
+
+	flexSolver = NvFlexCreateSolver(flexLibrary, &solverDesc);
+
+	flexParams = new NvFlexParams();
+
+	initParams(flexParams);
+
+	NvFlexSetParams(flexSolver, flexParams);
+
+	// Create buffers
+	particleBuffer = NvFlexAllocBuffer(flexLibrary, solverDesc.maxParticles, sizeof(float4), eNvFlexBufferHost);
+	velocityBuffer = NvFlexAllocBuffer(flexLibrary, solverDesc.maxParticles, sizeof(float3), eNvFlexBufferHost);
+	phaseBuffer = NvFlexAllocBuffer(flexLibrary, solverDesc.maxParticles, sizeof(int), eNvFlexBufferHost);
+	activeBuffer = NvFlexAllocBuffer(flexLibrary, solverDesc.maxParticles, sizeof(int), eNvFlexBufferHost);
+
+	// Geometry buffers 
+	geometryBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(NvFlexCollisionGeometry), eNvFlexBufferHost);
+	geoPosBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(float4), eNvFlexBufferHost);
+	geoFlagsBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(int), eNvFlexBufferHost);
+	geoQuatBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(float4), eNvFlexBufferHost);
+
+	// SO M ANY BUFF ER S
+	indicesBuffer = NvFlexAllocBuffer(flexLibrary, 4, sizeof(int), eNvFlexBufferHost);
+	lengthsBuffer = NvFlexAllocBuffer(flexLibrary, 2, sizeof(float), eNvFlexBufferHost);
+	coefficientsBuffer = NvFlexAllocBuffer(flexLibrary, 2, sizeof(float), eNvFlexBufferHost);
+
+	// Host buffer
+	particleBufferHost = static_cast<float4*>(malloc(sizeof(float4) * solverDesc.maxParticles));
+
+	bufferMutex = new std::mutex();
+
+	// Launch our flex solver thread
+	//done = false;
+	std::thread flexSolverThread(flexSolveThread);
+
+	flexSolverThread.detach(); // BE FREE
 
 	return 0;
 }
 
-
-GMOD_MODULE_CLOSE() {
-	simIsValid = false;
-	simIsRunning = false;
-	simCount = 0;
+// Called when the module is unloaded
+GMOD_MODULE_CLOSE()
+{
+	shutdownGWater();
 
 	return 0;
 }

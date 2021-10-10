@@ -56,7 +56,7 @@ local function triangulateWorld()
     return {m, Vector(minX, minY, minZ), Vector(maxX, maxY, maxZ)}
 end
 
-
+--[[
 
 gwater.Initialize()
 gwater.Unpause()
@@ -95,4 +95,4 @@ timer.Simple(10, function()
 	gwater.Pause()
 	gwater.DeleteSimulation()
 	timer.Remove("bruh")
-end)
+end)]]
