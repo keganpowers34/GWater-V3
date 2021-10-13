@@ -4,6 +4,7 @@
 #include <mutex>
 #include "types.h"
 #include "GarrysMod/Lua/Interface.h"
+#include <vector>
 
 extern NvFlexLibrary* flexLibrary;
 extern NvFlexSolver* flexSolver;
@@ -23,15 +24,18 @@ extern NvFlexBuffer* lengthsBuffer;
 extern NvFlexBuffer* coefficientsBuffer;
 
 extern NvFlexParams* flexParams;
-extern float4* particleBufferHost;
+extern NvFlexTriangleMeshId worldMesh;
+
+extern std::vector<float3> particleQueue;
+extern GarrysMod::Lua::ILuaBase* GlobalLUA;
+
 extern std::mutex* bufferMutex;
+extern float4* particleBufferHost;
 
 extern int numParticles;
 extern int propCount;
-
 extern bool simValid;
 
-extern GarrysMod::Lua::ILuaBase* GlobalLUA;
 
 extern void initParams(NvFlexParams* params);
 extern void flexSolveThread();

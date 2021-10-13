@@ -21,50 +21,24 @@ void printLua(char* text)
 	GlobalLUA->Pop();
 }
 
-
-
-//potato code
+//tysm this was very useful for debugging
 void gjelly_error(NvFlexErrorSeverity type, const char* msg, const char* file, int line) {
-	printLua("OH NO, FLEX ERROR!!!");
-	printLua(file);
-	printLua(std::to_string(line));
-	//printLua(std::to_string(type));
+	printLua("FLEX ERROR:");
 	printLua(msg);
+
 }
 
-void shutdownGWater() {
+//frees all FleX memory
+void shutdownGWater(GarrysMod::Lua::ILuaBase* LUA) {
 	simValid = false;
 
-	GlobalLUA->PushSpecial(SPECIAL_GLOB);
-	GlobalLUA->PushNil();
-	GlobalLUA->SetField(-2, "gwater"); // Simply set the gjelly table to nil
-	GlobalLUA->Pop(); // Pop off the global env
+	LUA->PushSpecial(SPECIAL_GLOB);
+	LUA->PushNil();
+	LUA->SetField(-2, "gwater"); 
+	LUA->Pop(); // pop _G
 
 	if (flexLibrary != nullptr) {
 		bufferMutex->lock();
-
-		// yeesh, to-do: make buffers fall inside a map (maybe?)
-		/*NvFlexFreeBuffer(particleBuffer);
-		NvFlexFreeBuffer(velocityBuffer);
-		NvFlexFreeBuffer(phaseBuffer);
-		NvFlexFreeBuffer(activeBuffer);
-		NvFlexFreeBuffer(lengthsBuffer);
-		NvFlexFreeBuffer(indicesBuffer);
-		NvFlexFreeBuffer(coefficientsBuffer);
-		NvFlexFreeBuffer(geometryBuffer);
-		NvFlexFreeBuffer(geoPosBuffer);
-		NvFlexFreeBuffer(geoQuatBuffer);
-		NvFlexFreeBuffer(geoFlagsBuffer);*/
-
-		/*for (Prop thisProp : props) {
-			NvFlexFreeBuffer(thisProp.verts);
-			NvFlexFreeBuffer(thisProp.indices);
-
-			NvFlexDestroyTriangleMesh(flexLib, thisProp.meshId);
-		}*/
-
-		NvFlexDestroySolver(flexSolver);
-		NvFlexShutdown(flexLibrary);
 
 		delete flexParams;
 		delete bufferMutex;
@@ -82,11 +56,11 @@ void shutdownGWater() {
 
 #define ADD_GWATER_FUNC(funcName, tblName) GlobalLUA->PushCFunction(funcName); GlobalLUA->SetField(-2, tblName);
 
-
+//returns particle xyz data
 LUA_FUNCTION(GetData) {
-	// Returns a table with all of the particles
 	LUA->CreateTable();
-	//printLua(std::to_string(numParticles));
+
+	//loop thru all particles & add to table (on stack)
 	for (int i = 0; i < numParticles; i++) {
 		LUA->PushNumber(i + 1);
 
@@ -105,7 +79,26 @@ LUA_FUNCTION(GetData) {
 
 //stops simulation
 LUA_FUNCTION(DeleteSimulation) {
-	shutdownGWater();
+	shutdownGWater(LUA);
+
+	return 0;
+}
+
+LUA_FUNCTION(AddParticle) {
+	//check to see if they are both vectors
+	LUA->CheckType(-2, Type::Vector); // pos
+	LUA->CheckType(-1, Type::Vector); // vel
+
+	//gmod Vector and fleX float4
+	Vector gmodPos = LUA->GetVector(-2);	//pos
+	Vector gmodVel = LUA->GetVector(-1);	//vel
+
+	//apply pos & vel to queue
+	particleQueue.push_back(float3{ gmodPos.x, gmodPos.y, gmodPos.z });
+	particleQueue.push_back(float3{ gmodVel.x, gmodVel.y, gmodVel.z });
+
+	//remove vel and pos from stack
+	LUA->Pop(2);	
 
 	return 0;
 }
@@ -118,48 +111,47 @@ LUA_FUNCTION(AddWorldMesh) {
 	LUA->CheckType(-1, Type::Table); // Sorted verts
 
 	size_t tableLen = LUA->ObjLen();
-	printLua(std::to_string(tableLen));
 	NvFlexBuffer* worldVerts = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(float4), eNvFlexBufferHost);
 	NvFlexBuffer* worldIndices = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(int), eNvFlexBufferHost);
 
-	float4* hostVerts = (float4*)NvFlexMap(worldVerts, eNvFlexMapWait);
-	int* hostIndices = (int*)NvFlexMap(worldIndices, eNvFlexMapWait);
+	float4* hostVerts = static_cast<float4*>(NvFlexMap(worldVerts, eNvFlexMapWait));
+	int* hostIndices = static_cast<int*>(NvFlexMap(worldIndices, eNvFlexMapWait));
 
+	//loop through map verticies
 	for (int i = 0; i < tableLen; i++) {
-		int actualIndex = i + 1;
-		float4 vert;
 
-		// Push our target index to the stack.
-		LUA->PushNumber(actualIndex);
-		// Get the table data at this index (and not get the table, which is what I thought this did.)
+		//lua is 1 indexed, C++ is 0 indexed
+		LUA->PushNumber(i + 1);
+
+		//gets data from table at the number ontop of the stack
 		LUA->GetTable(-2);
-		// Check for the sentinel nil element.
-		if (LUA->GetType(-1) == GarrysMod::Lua::Type::Nil) break;
-		// Get it's value.
-		Vector thisPos = LUA->GetVector();
-		vert.x = thisPos.x*10;
-		vert.y = thisPos.y*10;
-		vert.z = thisPos.z*10;
-		vert.w = 1.f / 2.f;
 
-		printLua(std::to_string(vert.x) + "," + std::to_string(vert.y) + "," + std::to_string(vert.z));
+		if (LUA->GetType(-1) == GarrysMod::Lua::Type::Nil) break;
+
+		//returns vector at -1 stack pos
+		Vector thisPos = LUA->GetVector();
+
+		float4 vert;
+		vert.x = thisPos.x;
+		vert.y = thisPos.y;
+		vert.z = thisPos.z;
+		vert.w = 1.f / 2.f;
 
 		hostVerts[i] = vert;
 		hostIndices[i] = i;
 
-		// CCW -> CW triangle winding
+		//counter clockwise -> clockwise triangle winding
 		if (i % 2 == 0) {
 			hostIndices[i - 1], hostIndices[i] = hostIndices[i], hostIndices[i - 1];
 		}
 
-		// Pop it off again.
-		LUA->Pop(1);
+		//remove the vector from the table
+		LUA->Pop();
 	}
 
 	// Pop off the nil
 	LUA->Pop();
 
-	// Ok, we're done, lets get our mesh id (and our min max)
 	NvFlexUnmap(worldVerts);
 	NvFlexUnmap(worldIndices);
 
@@ -169,33 +161,61 @@ LUA_FUNCTION(AddWorldMesh) {
 	float minFloat[3] = { minV.x, minV.y, minV.z };
 	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
 
-	NvFlexTriangleMeshId worldMeshID = NvFlexCreateTriangleMesh(flexLibrary);
+	NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
+	float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
+	float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
+	int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
 
-	NvFlexUpdateTriangleMesh(flexLibrary, worldMeshID, worldVerts, worldIndices, tableLen, tableLen / 3, minFloat, maxFloat);
+	// create the triangle mesh
+	worldMesh = NvFlexCreateTriangleMesh(flexLibrary);
+	NvFlexUpdateTriangleMesh(flexLibrary, worldMesh, worldVerts, worldIndices, tableLen, tableLen / 3, minFloat, maxFloat);
 
-	propCount++;
+	// add triangle mesh
+	flags[0] = NvFlexMakeShapeFlags(eNvFlexShapeTriangleMesh, false);
+	geometry[0].triMesh.mesh = worldMesh;
+	geometry[0].triMesh.scale[0] = 1.0f;
+	geometry[0].triMesh.scale[1] = 1.0f;
+	geometry[0].triMesh.scale[2] = 1.0f;
+	positions[0] = float4{ 0.0f, 0.0f, -12000.f, 0.f}; //0,0,-12000 IS FLATGRASS PLANE POSITION!
+	rotations[0] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 
-	//LUA->PushNumber(static_cast<double>(tableLen)); // The ID to the collider
+	//add sphere
+	flags[1] = NvFlexMakeShapeFlags(eNvFlexShapeSphere, false);
+	geometry[1].sphere.radius = 1000.f;
+	positions[1] = float4{ 0.0f, 0.0f, -12288.f, 0.f };
+	rotations[1] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+
+	// unmap buffers
+	NvFlexUnmap(geometryBuffer);
+	NvFlexUnmap(geoPosBuffer);
+	NvFlexUnmap(geoQuatBuffer);
+	NvFlexUnmap(geoFlagsBuffer);
+
+	//world mesh and sphere
+	propCount+=2;
+
+	// send shapes to Flex
+	NvFlexSetShapes(flexSolver, geometryBuffer, geoPosBuffer, geoQuatBuffer, NULL, NULL, geoFlagsBuffer, propCount);
+
+	printLua("[GWATER]: Added world mesh");
+
 	return 0;
+
 }
 
 GMOD_MODULE_OPEN()
 {
 	GlobalLUA = LUA;
-	//FILE* pFile = nullptr;
-
-	//freopen_s(&pFile, "CONOUT$", "w", stdout); // cursed way to redirect stdout to our own console
 	LUA->PushSpecial(SPECIAL_GLOB);
 
 	LUA->CreateTable();
 	ADD_GWATER_FUNC(GetData, "GetData");
 	ADD_GWATER_FUNC(DeleteSimulation, "DeleteSimulation");
 	ADD_GWATER_FUNC(AddWorldMesh, "AddWorldMesh");
-	//ADD_GWATER_FUNC(SetColliderPos, "SetColliderPos");
-	//ADD_GWATER_FUNC(SetColliderQuat, "SetColliderQuat");
+	ADD_GWATER_FUNC(AddParticle, "SpawnParticle");
 
 	LUA->SetField(-2, "gwater");
-	LUA->Pop(); // Remove global env
+	LUA->Pop(); //remove _G
 
 	// Initialize FleX
 	flexLibrary = NvFlexInit(120, gjelly_error);
@@ -206,11 +226,9 @@ GMOD_MODULE_OPEN()
 	solverDesc.maxDiffuseParticles = 0;
 
 	flexSolver = NvFlexCreateSolver(flexLibrary, &solverDesc);
-
 	flexParams = new NvFlexParams();
 
 	initParams(flexParams);
-
 	NvFlexSetParams(flexSolver, flexParams);
 
 	// Create buffers
@@ -221,33 +239,29 @@ GMOD_MODULE_OPEN()
 
 	// Geometry buffers 
 	geometryBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(NvFlexCollisionGeometry), eNvFlexBufferHost);
-	geoPosBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(float4), eNvFlexBufferHost);
+	geoPosBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(float3), eNvFlexBufferHost);
 	geoFlagsBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(int), eNvFlexBufferHost);
 	geoQuatBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(float4), eNvFlexBufferHost);
-
-	// SO M ANY BUFF ER S
-	indicesBuffer = NvFlexAllocBuffer(flexLibrary, 4, sizeof(int), eNvFlexBufferHost);
-	lengthsBuffer = NvFlexAllocBuffer(flexLibrary, 2, sizeof(float), eNvFlexBufferHost);
-	coefficientsBuffer = NvFlexAllocBuffer(flexLibrary, 2, sizeof(float), eNvFlexBufferHost);
 
 	// Host buffer
 	particleBufferHost = static_cast<float4*>(malloc(sizeof(float4) * solverDesc.maxParticles));
 
+	//create buffer for the thread
 	bufferMutex = new std::mutex();
 
 	// Launch our flex solver thread
-	//done = false;
 	std::thread flexSolverThread(flexSolveThread);
-
-	flexSolverThread.detach(); // BE FREE
+	flexSolverThread.detach();
 
 	return 0;
+
 }
 
 // Called when the module is unloaded
 GMOD_MODULE_CLOSE()
 {
-	shutdownGWater();
+	shutdownGWater(LUA);
 
 	return 0;
+
 }

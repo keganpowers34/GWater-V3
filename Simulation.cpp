@@ -1,69 +1,61 @@
 #include "declarations.h"
 #include "types.h"
 #include <string>
+#include <NvFlex.h>
 #include <NvFlexExt.h>
+#include <random>
 
 void flexSolveThread() {
 
+	//declarations
 	int simMaxParticles = 65536;
-	float simFramerate = 1.f / 30.f;	//the backend framerate of the simulation, if gmods fps is lower than this, god knows what will happen
-	int simFramerateMi = static_cast<int>(simFramerate * 1000.f);	//simulation framerate in milloseconds
+	float simFramerate = 1.f / 60.f;	
+	int simFramerateMi = static_cast<int>(simFramerate * 1000.f);
 
-	bool isFirst = true;	//for testing as of now
-
+	//particle position storage
 	particleBufferHost = static_cast<float4*>(malloc(sizeof(float4) * simMaxParticles));;
 
-	while (simValid)
-	{
+	//runs always while sim is active
+	while (simValid) {
+
 		bufferMutex->lock();
-		// If we do block--that could mean we were just shut down..
-		// eg. the shutdown thread locked and exited
+
+		//because we are in a buffer lock, the simulation might have already been shut down (even with the while loop check!)
 		if (!simValid) {
 			bufferMutex->unlock();
 			break;
+
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(simFramerateMi));
 
 		// map buffers for reading / writing
-		float4* particles = (float4*)NvFlexMap(particleBuffer, eNvFlexMapWait);
-		float3* velocities = (float3*)NvFlexMap(velocityBuffer, eNvFlexMapWait);
-		int* phases = (int*)NvFlexMap(phaseBuffer, eNvFlexMapWait);
-		int* activeIndices = (int*)NvFlexMap(activeBuffer, eNvFlexMapWait);
+		float4* particles = static_cast<float4*>(NvFlexMap(particleBuffer, eNvFlexMapWait));
+		float3* velocities = static_cast<float3*>(NvFlexMap(velocityBuffer, eNvFlexMapWait));
+		int* phases = static_cast<int*>(NvFlexMap(phaseBuffer, eNvFlexMapWait));
+		int* activeIndices = static_cast<int*>(NvFlexMap(activeBuffer, eNvFlexMapWait));
 
-		NvFlexCollisionGeometry* geometry = (NvFlexCollisionGeometry*)NvFlexMap(geometryBuffer, 0);
-		float4* positions = (float4*)NvFlexMap(geoPosBuffer, 0);
-		float4* rotations = (float4*)NvFlexMap(geoQuatBuffer, 0);
-		int* flags = (int*)NvFlexMap(geoFlagsBuffer, 0);
+		//loop through queue and add requested particles
+		int size = particleQueue.size() - 1;
+		for (int i = 0; i < size; i+=2) {
 
-		if (isFirst) {
-			for (int i = 0; i < 100; i++) {
-				float4 thisPos = float4{};
-				phases[i] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);
-				activeIndices[i] = i;
+			//0:pos 1:vel
+			float3 particlePos = particleQueue[0];
+			
+			//apply data
+			phases[numParticles] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);
+			activeIndices[numParticles] = numParticles;
+			particles[numParticles] = float4{ particlePos.x, particlePos.y, particlePos.z, 0.5f };
+			velocities[numParticles] = particleQueue[1];
 
-				thisPos.x = 0;
-				thisPos.y = 0;
-				thisPos.z = i * 10.f;
-				thisPos.w = 1.f / 2.f;	//mass
-
-				particles[i] = thisPos;
-				velocities[i] = float3{i - 50.f, i - 50.f, 1.f};
-
-				numParticles++;
-			}
-
-			isFirst = false;
+			//remove vel and pos instance from queue
+			particleQueue.erase(particleQueue.begin(), particleQueue.begin() + 2);
+			numParticles++;
+				
 		}
-
-		//copy memory to be given to the client when requested
-		memcpy(particleBufferHost, particles, sizeof(float4) * numParticles);	
-
-		NvFlexUnmap(geometryBuffer);
-		NvFlexUnmap(geoPosBuffer);
-		NvFlexUnmap(geoQuatBuffer);
-		NvFlexUnmap(geoFlagsBuffer);
 		
+		//copy particle positions (gpu memory fuckery)
+		memcpy(particleBufferHost, particles, sizeof(float4) * numParticles);	
 
 		// unmap buffers
 		NvFlexUnmap(particleBuffer);
@@ -77,11 +69,10 @@ void flexSolveThread() {
 		NvFlexSetPhases(flexSolver, phaseBuffer, NULL);
 		NvFlexSetActive(flexSolver, activeBuffer, NULL);
 		NvFlexSetActiveCount(flexSolver, numParticles);
-		NvFlexSetShapes(flexSolver, geometryBuffer, geoPosBuffer, geoQuatBuffer, NULL, NULL, geoFlagsBuffer, propCount);	//last null is for colliders
-		// tick
-		
-		//NvFlexSetParams(flexSolver, flexParams);	//not required
-		NvFlexUpdateSolver(flexSolver, simFramerate * 5, 2, false);
+		NvFlexSetShapes(flexSolver, geometryBuffer, geoPosBuffer, geoQuatBuffer, NULL, NULL, geoFlagsBuffer, propCount);	//doesnt work??
+
+		// tick the solver (5 times the default looks about right -potato)
+		NvFlexUpdateSolver(flexSolver, simFramerate * 5, 4, false);
 
 		// read back (async)
 		NvFlexGetParticles(flexSolver, particleBuffer, NULL);
@@ -89,6 +80,7 @@ void flexSolveThread() {
 		NvFlexGetPhases(flexSolver, phaseBuffer, NULL);
 
 		bufferMutex->unlock();	//dont forget to unlock our buffer
+
 	}
 
 }
