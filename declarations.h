@@ -24,9 +24,10 @@ extern NvFlexBuffer* lengthsBuffer;
 extern NvFlexBuffer* coefficientsBuffer;
 
 extern NvFlexParams* flexParams;
+extern NvFlexSolverDesc flexSolverDesc;
 extern NvFlexTriangleMeshId worldMesh;
 
-extern std::vector<float3> particleQueue;
+extern std::vector<Particle> particleQueue;
 extern GarrysMod::Lua::ILuaBase* GlobalLUA;
 
 extern std::mutex* bufferMutex;
@@ -35,6 +36,7 @@ extern float4* particleBufferHost;
 extern int numParticles;
 extern int propCount;
 extern bool simValid;
+extern bool flexRemoveQueue;
 
 
 extern void initParams(NvFlexParams* params);

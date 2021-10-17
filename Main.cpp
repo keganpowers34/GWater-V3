@@ -3,6 +3,8 @@
 
 using namespace GarrysMod::Lua;
 
+#define MAX_COLLIDERS 30
+
 //overloaded printlua func
 void printLua(std::string text)
 {
@@ -41,7 +43,6 @@ void shutdownGWater(GarrysMod::Lua::ILuaBase* LUA) {
 		bufferMutex->lock();
 
 		delete flexParams;
-		delete bufferMutex;
 
 		free(particleBufferHost);
 
@@ -49,8 +50,25 @@ void shutdownGWater(GarrysMod::Lua::ILuaBase* LUA) {
 
 		bufferMutex->unlock();
 
+		delete bufferMutex;
+
 	}
 
+
+}
+
+void initFleX() {
+	flexLibrary = NvFlexInit(120, gjelly_error);
+
+	NvFlexSetSolverDescDefaults(&flexSolverDesc);
+	flexSolverDesc.maxParticles = 65536;
+	flexSolverDesc.maxDiffuseParticles = 0;
+
+	flexParams = new NvFlexParams();
+	initParams(flexParams);
+
+	flexSolver = NvFlexCreateSolver(flexLibrary, &flexSolverDesc);
+	NvFlexSetParams(flexSolver, flexParams);
 
 }
 
@@ -74,7 +92,21 @@ LUA_FUNCTION(GetData) {
 		LUA->SetTable(-3);
 	}
 
-	return 1;
+	LUA->PushNumber(static_cast<double>(numParticles));
+
+	return 2;
+}
+
+LUA_FUNCTION(RemoveAllParticles) {
+
+	//bufferMutex->lock();
+
+	flexRemoveQueue = true;
+
+	//bufferMutex->unlock();
+
+	return 0;
+
 }
 
 //stops simulation
@@ -94,8 +126,8 @@ LUA_FUNCTION(AddParticle) {
 	Vector gmodVel = LUA->GetVector(-1);	//vel
 
 	//apply pos & vel to queue
-	particleQueue.push_back(float3{ gmodPos.x, gmodPos.y, gmodPos.z });
-	particleQueue.push_back(float3{ gmodVel.x, gmodVel.y, gmodVel.z });
+	Particle particle = { float4{ gmodPos.x, gmodPos.y, gmodPos.z , 0.5}, float3{gmodVel.x, gmodVel.y, gmodVel.z} };
+	particleQueue.push_back(particle);
 
 	//remove vel and pos from stack
 	LUA->Pop(2);	
@@ -135,15 +167,18 @@ LUA_FUNCTION(AddWorldMesh) {
 		vert.x = thisPos.x;
 		vert.y = thisPos.y;
 		vert.z = thisPos.z;
-		vert.w = 1.f / 2.f;
+		vert.w = 0.5f;
 
 		hostVerts[i] = vert;
 		hostIndices[i] = i;
 
 		//counter clockwise -> clockwise triangle winding
-		if (i % 2 == 0) {
-			hostIndices[i - 1], hostIndices[i] = hostIndices[i], hostIndices[i - 1];
-		}
+		//if (i % 2 == 0) {
+		//	int host = hostIndices[i];
+		//	hostIndices[i] = hostIndices[i - 1];
+		//	hostIndices[i - 1] = host;
+
+		//}
 
 		//remove the vector from the table
 		LUA->Pop();
@@ -176,14 +211,8 @@ LUA_FUNCTION(AddWorldMesh) {
 	geometry[0].triMesh.scale[0] = 1.0f;
 	geometry[0].triMesh.scale[1] = 1.0f;
 	geometry[0].triMesh.scale[2] = 1.0f;
-	positions[0] = float4{ 0.0f, 0.0f, -12000.f, 0.f}; //0,0,-12000 IS FLATGRASS PLANE POSITION!
+	positions[0] = float4{ 0.0f, 0.0f, 0.f, 0.5f }; //0,0,-12000 IS FLATGRASS PLANE POSITION!
 	rotations[0] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-
-	//add sphere
-	flags[1] = NvFlexMakeShapeFlags(eNvFlexShapeSphere, false);
-	geometry[1].sphere.radius = 1000.f;
-	positions[1] = float4{ 0.0f, 0.0f, -12288.f, 0.f };
-	rotations[1] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 
 	// unmap buffers
 	NvFlexUnmap(geometryBuffer);
@@ -192,7 +221,14 @@ LUA_FUNCTION(AddWorldMesh) {
 	NvFlexUnmap(geoFlagsBuffer);
 
 	//world mesh and sphere
-	propCount+=2;
+	propCount+=1;
+
+	for (int i = propCount; i < 33; i++) {
+		positions[propCount] = float4{ 0.0f, 0.0f, 0.f, 0.5f };
+		rotations[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+
+		propCount++;
+	}
 
 	// send shapes to Flex
 	NvFlexSetShapes(flexSolver, geometryBuffer, geoPosBuffer, geoQuatBuffer, NULL, NULL, geoFlagsBuffer, propCount);
@@ -213,38 +249,28 @@ GMOD_MODULE_OPEN()
 	ADD_GWATER_FUNC(DeleteSimulation, "DeleteSimulation");
 	ADD_GWATER_FUNC(AddWorldMesh, "AddWorldMesh");
 	ADD_GWATER_FUNC(AddParticle, "SpawnParticle");
+	ADD_GWATER_FUNC(RemoveAllParticles, "RemoveAll");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); //remove _G
 
 	// Initialize FleX
-	flexLibrary = NvFlexInit(120, gjelly_error);
-
-	NvFlexSolverDesc solverDesc;
-	NvFlexSetSolverDescDefaults(&solverDesc);
-	solverDesc.maxParticles = 65536;
-	solverDesc.maxDiffuseParticles = 0;
-
-	flexSolver = NvFlexCreateSolver(flexLibrary, &solverDesc);
-	flexParams = new NvFlexParams();
-
-	initParams(flexParams);
-	NvFlexSetParams(flexSolver, flexParams);
+	initFleX();
 
 	// Create buffers
-	particleBuffer = NvFlexAllocBuffer(flexLibrary, solverDesc.maxParticles, sizeof(float4), eNvFlexBufferHost);
-	velocityBuffer = NvFlexAllocBuffer(flexLibrary, solverDesc.maxParticles, sizeof(float3), eNvFlexBufferHost);
-	phaseBuffer = NvFlexAllocBuffer(flexLibrary, solverDesc.maxParticles, sizeof(int), eNvFlexBufferHost);
-	activeBuffer = NvFlexAllocBuffer(flexLibrary, solverDesc.maxParticles, sizeof(int), eNvFlexBufferHost);
+	particleBuffer = NvFlexAllocBuffer(flexLibrary, flexSolverDesc.maxParticles, sizeof(float4), eNvFlexBufferHost);
+	velocityBuffer = NvFlexAllocBuffer(flexLibrary, flexSolverDesc.maxParticles, sizeof(float3), eNvFlexBufferHost);
+	phaseBuffer = NvFlexAllocBuffer(flexLibrary, flexSolverDesc.maxParticles, sizeof(int), eNvFlexBufferHost);
+	activeBuffer = NvFlexAllocBuffer(flexLibrary, flexSolverDesc.maxParticles, sizeof(int), eNvFlexBufferHost);
 
 	// Geometry buffers 
-	geometryBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(NvFlexCollisionGeometry), eNvFlexBufferHost);
-	geoPosBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(float3), eNvFlexBufferHost);
-	geoFlagsBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(int), eNvFlexBufferHost);
-	geoQuatBuffer = NvFlexAllocBuffer(flexLibrary, 30, sizeof(float4), eNvFlexBufferHost);
+	geometryBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(NvFlexCollisionGeometry), eNvFlexBufferHost);
+	geoPosBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(float4), eNvFlexBufferHost);
+	geoFlagsBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(int), eNvFlexBufferHost);
+	geoQuatBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(float4), eNvFlexBufferHost);
 
 	// Host buffer
-	particleBufferHost = static_cast<float4*>(malloc(sizeof(float4) * solverDesc.maxParticles));
+	particleBufferHost = static_cast<float4*>(malloc(sizeof(float4) * flexSolverDesc.maxParticles));
 
 	//create buffer for the thread
 	bufferMutex = new std::mutex();

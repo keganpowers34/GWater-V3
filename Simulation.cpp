@@ -8,12 +8,11 @@
 void flexSolveThread() {
 
 	//declarations
-	int simMaxParticles = 65536;
 	float simFramerate = 1.f / 60.f;	
 	int simFramerateMi = static_cast<int>(simFramerate * 1000.f);
 
 	//particle position storage
-	particleBufferHost = static_cast<float4*>(malloc(sizeof(float4) * simMaxParticles));;
+	particleBufferHost = static_cast<float4*>(malloc(sizeof(float4) * flexSolverDesc.maxParticles));;
 
 	//runs always while sim is active
 	while (simValid) {
@@ -27,7 +26,18 @@ void flexSolveThread() {
 
 		}
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(simFramerateMi));
+
+		if (flexRemoveQueue) {
+			particleBuffer = NvFlexAllocBuffer(flexLibrary, flexSolverDesc.maxParticles, sizeof(float4), eNvFlexBufferHost);
+			velocityBuffer = NvFlexAllocBuffer(flexLibrary, flexSolverDesc.maxParticles, sizeof(float3), eNvFlexBufferHost);
+			phaseBuffer = NvFlexAllocBuffer(flexLibrary, flexSolverDesc.maxParticles, sizeof(int), eNvFlexBufferHost);
+			activeBuffer = NvFlexAllocBuffer(flexLibrary, flexSolverDesc.maxParticles, sizeof(int), eNvFlexBufferHost);
+			particleQueue.clear();
+
+			numParticles = 0;
+			
+			flexRemoveQueue = false;
+		}
 
 		// map buffers for reading / writing
 		float4* particles = static_cast<float4*>(NvFlexMap(particleBuffer, eNvFlexMapWait));
@@ -35,27 +45,26 @@ void flexSolveThread() {
 		int* phases = static_cast<int*>(NvFlexMap(phaseBuffer, eNvFlexMapWait));
 		int* activeIndices = static_cast<int*>(NvFlexMap(activeBuffer, eNvFlexMapWait));
 
-		//loop through queue and add requested particles
-		int size = particleQueue.size() - 1;
-		for (int i = 0; i < size; i+=2) {
 
-			//0:pos 1:vel
-			float3 particlePos = particleQueue[0];
-			
+		//loop through queue and add requested particles
+		// AndrewEathan was here
+		for (Particle& particle : particleQueue) {
+
 			//apply data
+			particles[numParticles] = particle.pos;
+			velocities[numParticles] = particle.vel;
 			phases[numParticles] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);
 			activeIndices[numParticles] = numParticles;
-			particles[numParticles] = float4{ particlePos.x, particlePos.y, particlePos.z, 0.5f };
-			velocities[numParticles] = particleQueue[1];
 
-			//remove vel and pos instance from queue
-			particleQueue.erase(particleQueue.begin(), particleQueue.begin() + 2);
+			//add 1 particle
 			numParticles++;
-				
+
 		}
+
+		particleQueue.clear();
 		
 		//copy particle positions (gpu memory fuckery)
-		memcpy(particleBufferHost, particles, sizeof(float4) * numParticles);	
+		memcpy(particleBufferHost, particles, sizeof(float4) * numParticles);
 
 		// unmap buffers
 		NvFlexUnmap(particleBuffer);
@@ -78,8 +87,11 @@ void flexSolveThread() {
 		NvFlexGetParticles(flexSolver, particleBuffer, NULL);
 		NvFlexGetVelocities(flexSolver, velocityBuffer, NULL);
 		NvFlexGetPhases(flexSolver, phaseBuffer, NULL);
+		NvFlexGetActive(flexSolver, activeBuffer, NULL);
 
 		bufferMutex->unlock();	//dont forget to unlock our buffer
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(simFramerateMi));
 
 	}
 

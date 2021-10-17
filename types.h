@@ -6,3 +6,8 @@ struct float4 {
 struct float3 {
     float x, y, z;
 };
+
+struct Particle {
+    float4 pos;
+    float3 vel;
+};
