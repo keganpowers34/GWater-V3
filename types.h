@@ -11,3 +11,10 @@ struct Particle {
     float4 pos;
     float3 vel;
 };
+
+struct Prop {
+    NvFlexBuffer* verts;
+    NvFlexBuffer* indices;
+    NvFlexTriangleMeshId meshID;
+};
+

@@ -17,6 +17,10 @@ void flexSolveThread() {
 	//runs always while sim is active
 	while (simValid) {
 
+		std::this_thread::sleep_for(std::chrono::milliseconds(simFramerateMi));
+
+		if (numParticles < 1 && particleQueue.size() < 1) continue;
+
 		bufferMutex->lock();
 
 		//because we are in a buffer lock, the simulation might have already been shut down (even with the while loop check!)
@@ -44,7 +48,6 @@ void flexSolveThread() {
 		float3* velocities = static_cast<float3*>(NvFlexMap(velocityBuffer, eNvFlexMapWait));
 		int* phases = static_cast<int*>(NvFlexMap(phaseBuffer, eNvFlexMapWait));
 		int* activeIndices = static_cast<int*>(NvFlexMap(activeBuffer, eNvFlexMapWait));
-
 
 		//loop through queue and add requested particles
 		// AndrewEathan was here
@@ -90,8 +93,6 @@ void flexSolveThread() {
 		NvFlexGetActive(flexSolver, activeBuffer, NULL);
 
 		bufferMutex->unlock();	//dont forget to unlock our buffer
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(simFramerateMi));
 
 	}
 

@@ -36,7 +36,7 @@ int propCount = 0;
 bool simValid = true;
 bool flexRemoveQueue = false;
 
-void initParams(NvFlexParams* params) {
+void initParams(NvFlexParams* params, float r) {
 	params->gravity[0] = 0.0f;
 	params->gravity[1] = 0.0f;
 	params->gravity[2] = -9.8f;
@@ -45,16 +45,16 @@ void initParams(NvFlexParams* params) {
 	params->wind[1] = 0.0f;
 	params->wind[2] = 0.0f;
 
-	params->radius = 25.f;
+	params->radius = r;
 	params->viscosity = 0.0f;
-	params->dynamicFriction = 0.01f;
-	params->staticFriction = 0.01f;
+	params->dynamicFriction = 5/r;
+	params->staticFriction = 0.0f;
 	params->particleFriction = 0.01f; // scale friction between particles by default
-	params->freeSurfaceDrag = 0.01f;
+	params->freeSurfaceDrag = 0.0f;
 	params->drag = 0.0f;
 	params->lift = 1.0f;
 	params->numIterations = 4;
-	params->fluidRestDistance = params->radius * 0.8f;
+	params->fluidRestDistance = params->radius * 0.7f;
 	params->solidRestDistance = 5.f;
 
 	params->anisotropyScale = 0.0f;
@@ -75,7 +75,7 @@ void initParams(NvFlexParams* params) {
 	params->maxAcceleration = 100.0f;	// approximately 10x gravity
 	params->relaxationMode = eNvFlexRelaxationLocal;
 	params->relaxationFactor = 1.0f;
-	params->solidPressure = 0.0f;
+	params->solidPressure = 1.0f;
 	params->adhesion = 0.0f;
 	params->cohesion = 0.005f;
 	params->surfaceTension = 0.0f;

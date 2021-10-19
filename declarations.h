@@ -39,7 +39,7 @@ extern bool simValid;
 extern bool flexRemoveQueue;
 
 
-extern void initParams(NvFlexParams* params);
+extern void initParams(NvFlexParams* params, float r);
 extern void flexSolveThread();
 extern void printLua(std::string text);
 extern void printLua(char*);

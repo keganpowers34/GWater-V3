@@ -42,6 +42,15 @@ void shutdownGWater(GarrysMod::Lua::ILuaBase* LUA) {
 	if (flexLibrary != nullptr) {
 		bufferMutex->lock();
 
+		NvFlexFreeBuffer(particleBuffer);
+		NvFlexFreeBuffer(velocityBuffer);
+		NvFlexFreeBuffer(phaseBuffer);
+		NvFlexFreeBuffer(activeBuffer);
+		NvFlexFreeBuffer(geometryBuffer);
+		NvFlexFreeBuffer(geoPosBuffer);
+		NvFlexFreeBuffer(geoQuatBuffer);
+		NvFlexFreeBuffer(geoFlagsBuffer);
+
 		delete flexParams;
 
 		free(particleBufferHost);
@@ -65,7 +74,7 @@ void initFleX() {
 	flexSolverDesc.maxDiffuseParticles = 0;
 
 	flexParams = new NvFlexParams();
-	initParams(flexParams);
+	initParams(flexParams, 10.f);
 
 	flexSolver = NvFlexCreateSolver(flexLibrary, &flexSolverDesc);
 	NvFlexSetParams(flexSolver, flexParams);
@@ -98,13 +107,15 @@ LUA_FUNCTION(GetData) {
 }
 
 LUA_FUNCTION(RemoveAllParticles) {
-
-	//bufferMutex->lock();
-
 	flexRemoveQueue = true;
+	return 0;
 
-	//bufferMutex->unlock();
+}
 
+LUA_FUNCTION(SetRadius) {
+	LUA->CheckType(-1, Type::Number);
+	initParams(flexParams, static_cast<float>(LUA->GetNumber()));
+	NvFlexSetParams(flexSolver, flexParams);
 	return 0;
 
 }
@@ -112,7 +123,6 @@ LUA_FUNCTION(RemoveAllParticles) {
 //stops simulation
 LUA_FUNCTION(DeleteSimulation) {
 	shutdownGWater(LUA);
-
 	return 0;
 }
 
@@ -138,9 +148,17 @@ LUA_FUNCTION(AddParticle) {
 //the world mesh
 LUA_FUNCTION(AddWorldMesh) {
 
-	LUA->CheckType(-3, Type::Vector); // Max
-	LUA->CheckType(-2, Type::Vector); // Min
-	LUA->CheckType(-1, Type::Table); // Sorted verts
+	LUA->CheckType(-1, Type::Vector); // Min
+	LUA->CheckType(-2, Type::Vector); // Max
+	LUA->CheckType(-3, Type::Table); // Sorted verts
+
+	Vector maxV = LUA->GetVector();
+	Vector minV = LUA->GetVector(-2);
+
+	float minFloat[3] = { minV.x, minV.y, minV.z };
+	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
+
+	LUA->Pop(2);	//pop off min max
 
 	size_t tableLen = LUA->ObjLen();
 	NvFlexBuffer* worldVerts = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(float4), eNvFlexBufferHost);
@@ -173,7 +191,7 @@ LUA_FUNCTION(AddWorldMesh) {
 		hostIndices[i] = i;
 
 		//counter clockwise -> clockwise triangle winding
-		//if (i % 2 == 0) {
+		//if (i % 3 == 1) {
 		//	int host = hostIndices[i];
 		//	hostIndices[i] = hostIndices[i - 1];
 		//	hostIndices[i - 1] = host;
@@ -189,12 +207,6 @@ LUA_FUNCTION(AddWorldMesh) {
 
 	NvFlexUnmap(worldVerts);
 	NvFlexUnmap(worldIndices);
-
-	Vector minV = LUA->GetVector();
-	Vector maxV = LUA->GetVector(-2);
-
-	float minFloat[3] = { minV.x, minV.y, minV.z };
-	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
 
 	NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
 	float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
@@ -214,30 +226,27 @@ LUA_FUNCTION(AddWorldMesh) {
 	positions[0] = float4{ 0.0f, 0.0f, 0.f, 0.5f }; //0,0,-12000 IS FLATGRASS PLANE POSITION!
 	rotations[0] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
 
+	for (int i = 0; i < pow(2, 8); i++) {	//idk why this works, just make sure the count of 'i' is like 2x greater than the max collision amount
+		positions[i] = float4{ 0.0f, 0.0f, 0.0f, 1.f };
+	}
+
 	// unmap buffers
 	NvFlexUnmap(geometryBuffer);
 	NvFlexUnmap(geoPosBuffer);
 	NvFlexUnmap(geoQuatBuffer);
 	NvFlexUnmap(geoFlagsBuffer);
 
-	//world mesh and sphere
+	//world mesh
 	propCount+=1;
-
-	for (int i = propCount; i < 33; i++) {
-		positions[propCount] = float4{ 0.0f, 0.0f, 0.f, 0.5f };
-		rotations[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
-
-		propCount++;
-	}
-
-	// send shapes to Flex
-	NvFlexSetShapes(flexSolver, geometryBuffer, geoPosBuffer, geoQuatBuffer, NULL, NULL, geoFlagsBuffer, propCount);
 
 	printLua("[GWATER]: Added world mesh");
 
 	return 0;
 
 }
+
+
+
 
 GMOD_MODULE_OPEN()
 {
@@ -250,6 +259,7 @@ GMOD_MODULE_OPEN()
 	ADD_GWATER_FUNC(AddWorldMesh, "AddWorldMesh");
 	ADD_GWATER_FUNC(AddParticle, "SpawnParticle");
 	ADD_GWATER_FUNC(RemoveAllParticles, "RemoveAll");
+	ADD_GWATER_FUNC(SetRadius, "SetRadius");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); //remove _G
