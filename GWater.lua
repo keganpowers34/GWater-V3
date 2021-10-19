@@ -1,8 +1,11 @@
-require("GWater_Rewrite")
-print(_G.gwater)
+
+if not _G.gwater then
+	require("GWater_Rewrite")
+end
+
 
 local function triangulateWorld()
-    local surfaces = game.GetWorld():GetBrushSurfaces()
+  local surfaces = game.GetWorld():GetBrushSurfaces()
 	local m = {}
 
 	local maxX = 0
@@ -14,85 +17,79 @@ local function triangulateWorld()
 	local minZ = 0
 
 	for i = 1, #surfaces do
-        if surfaces[i]:IsNoDraw() then continue end
+      if surfaces[i]:IsNoDraw() then continue end
 
-        local surface = surfaces[i]:GetVertices()
-        for i = 3, #surface do
-	        local len = #m
-	        m[len + 1] = Vector(surface[1].x, surface[1].y, surface[1].z)
-	        m[len + 2] = Vector(surface[i - 1].x, surface[i - 1].y, surface[i - 1].z)
-	        m[len + 3] = Vector(surface[i].x, surface[i].y, surface[i].z)
+      local surface = surfaces[i]:GetVertices()
+      for i = 3, #surface do
+        local len = #m
+        m[len + 1] = Vector(surface[1].x, surface[1].y, surface[1].z)
+        m[len + 3] = Vector(surface[i - 1].x, surface[i - 1].y, surface[i - 1].z)
+        m[len + 2] = Vector(surface[i].x, surface[i].y, surface[i].z)
 
-	        --max
-	        maxX = math.max(maxX, surface[1].x)
-	        maxX = math.max(maxX, surface[i-1].x)
-	        maxX = math.max(maxX, surface[i].x)
+	  	end
 
-	        maxY = math.max(maxY, surface[1].y)
-	        maxY = math.max(maxY, surface[i-1].y)
-	        maxY = math.max(maxY, surface[i].y)
-
-	        maxZ = math.max(maxZ, surface[1].z)
-	        maxZ = math.max(maxZ, surface[i-1].z)
-	        maxZ = math.max(maxZ, surface[i].z)
-
-	        --min
-
-	        minX = math.min(minX, surface[1].x)
-	        minX = math.min(minX, surface[i-1].x)
-	        minX = math.min(minX, surface[i].x)
-
-	        minY = math.min(minY, surface[1].y)
-	        minY = math.min(minY, surface[i-1].y)
-	        minY = math.min(minY, surface[i].y)
-
-	        minZ = math.min(minZ, surface[1].z)
-	        minZ = math.min(minZ, surface[i-1].z)
-	        minZ = math.min(minZ, surface[i].z)
-
-	    end
-    end
-    
-    return {m, Vector(minX, minY, minZ), Vector(maxX, maxY, maxZ)}
+	end
+	  
+	  return m
 end
 
---[[
+local mblue = CreateMaterial( "shitter05", "UnlitGeneric", {
+  ["$basetexture"] = "phoenix_storms/blue_steel",
+})
 
-gwater.Initialize()
-gwater.Unpause()
-gwater.SetRadius(10)
+local mwhite = CreateMaterial( "shitter04", "UnlitGeneric", {
+  ["$basetexture"] = "lights/white",
+})
 
-local m = CreateMaterial( "shitter05", "UnlitGeneric", {
-  ["$basetexture"] = "sprites/strider_blackball",
+local mgrey = CreateMaterial( "shitter03", "UnlitGeneric", {
+  ["$basetexture"] = "hunter/myplastic",
   ["$translucent"] = 1,
   ["$vertexalpha"] = 1,
 })
 
-timer.Simple(1, function()
-	local worldverts = triangulateWorld()
 
-	print(worldverts[2])
-	print(worldverts[3])
-	gwater.AddWorldMesh(worldverts[3], worldverts[2], worldverts[1])
+GWATER_RADIUS = 10
 
-	timer.Create("oh my shit", 1, 1, function()
-		gwater.SpawnParticle(LocalPlayer():GetPos() + Vector(0, 0, 50), Vector(0, 0, 0))
-	end)
+	gwater.AddWorldMesh(triangulateWorld(), Vector(-33000, -33000, -33000), Vector(33000, 33000, 33000))
 
-	local data = {}
-
+	local data, particleCount
 	hook.Add("PostDrawOpaqueRenderables", "bruh", function()
-		data = gwater.GetData()
-		//PrintTable(data)
-		render.SetMaterial(m)
-		for i=1, #data do
-			render.DrawSprite(data[i], 10, 10, Color( 255, 255, 255 ) )
-		end
-	end)
-end)
 
-timer.Simple(10, function() 
-	gwater.Pause()
-	gwater.DeleteSimulation()
-	timer.Remove("bruh")
-end)]]
+		if (LocalPlayer():KeyDown(2048)) then
+			for i = 1, 10 do
+				gwater.SpawnParticle(LocalPlayer():GetPos() + Vector(0, 0, 63) + EyeVector() * 100 + VectorRand(-10, 10) , EyeVector() * 100)
+			end
+		end
+
+		if (LocalPlayer():KeyDown(32)) then
+			gwater.RemoveAll()
+
+		end
+
+		data, particleCount = gwater.GetData()
+
+		render.SetMaterial(mwhite)
+		render.DrawSprite(Vector(0, 0, 0), 10, 10, Color( 255, 255, 255 ) )
+
+		render.SetMaterial(mblue)
+		for i=1, math.min(#data, 18000) do
+			local particlePos = data[i]
+			--if (particlePos-EyePos()):GetNormalized():Dot(EyeVector()) < 0.75 then continue end
+			render.DrawSprite(particlePos, GWATER_RADIUS, GWATER_RADIUS, Color( 255, 255, 255 ) )
+			//render.DrawSphere(particlePos, 10, 7, 7, Color( 255, 255, 255 ) )
+		end
+
+	end)
+
+
+	hook.Add( "HUDPaint", "Particles", function() 
+		draw.DrawText(tostring(particleCount), "TargetID", ScrW() * 0.99, ScrH() * 0.01, color_white, TEXT_ALIGN_RIGHT )
+	end )
+
+
+
+//timer.Simple(1000, function() 
+//	print("Removing solver")
+//	gwater.DeleteSimulation()
+//	hook.Remove("PostDrawOpaqueRenderables", "bruh")
+//end)
