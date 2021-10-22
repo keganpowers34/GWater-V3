@@ -3,7 +3,7 @@
 
 using namespace GarrysMod::Lua;
 
-#define MAX_COLLIDERS 30
+#define MAX_COLLIDERS 1000
 
 //overloaded printlua func
 void printLua(std::string text)
@@ -81,6 +81,62 @@ void initFleX() {
 
 }
 
+//generates mesh
+NvFlexTriangleMeshId calcMesh(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen, Prop* p) {
+
+	p->verts = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(float4), eNvFlexBufferHost);
+	p->indices = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(int), eNvFlexBufferHost);
+
+	float4* hostVerts = static_cast<float4*>(NvFlexMap(p->verts, eNvFlexMapWait));
+	int* hostIndices = static_cast<int*>(NvFlexMap(p->indices, eNvFlexMapWait));
+
+	//loop through map verticies
+	for (int i = 0; i < tableLen; i++) {
+
+		//lua is 1 indexed, C++ is 0 indexed
+		LUA->PushNumber(i + 1);
+
+		//gets data from table at the number ontop of the stack
+		LUA->GetTable(-2);
+
+		//returns vector at -1 stack pos
+		Vector thisPos = LUA->GetVector();
+
+		float4 vert;
+		vert.x = thisPos.x;
+		vert.y = thisPos.y;
+		vert.z = thisPos.z;
+		vert.w = 1.f;
+
+		hostVerts[i] = vert;
+		hostIndices[i] = i;
+
+		//counter clockwise -> clockwise triangle winding
+		if (i % 3 == 1) {
+			int host = hostIndices[i];
+			hostIndices[i] = hostIndices[i - 1];
+			hostIndices[i - 1] = host;
+
+		}
+
+		//remove the vector from the table
+		LUA->Pop();
+	}
+
+	// Pop off the table
+	LUA->Pop();
+
+	NvFlexUnmap(p->verts);
+	NvFlexUnmap(p->indices);
+
+	// create the triangle mesh
+	NvFlexTriangleMeshId generatedMesh = NvFlexCreateTriangleMesh(flexLibrary);
+	NvFlexUpdateTriangleMesh(flexLibrary, generatedMesh, p->verts, p->indices, tableLen, tableLen / 3, minFloat, maxFloat);
+
+	return generatedMesh;
+
+}
+
 #define ADD_GWATER_FUNC(funcName, tblName) GlobalLUA->PushCFunction(funcName); GlobalLUA->SetField(-2, tblName);
 
 //returns particle xyz data
@@ -146,101 +202,125 @@ LUA_FUNCTION(AddParticle) {
 }
 
 //the world mesh
-LUA_FUNCTION(AddWorldMesh) {
+LUA_FUNCTION(AddMesh) {
 
-	LUA->CheckType(-1, Type::Vector); // Min
-	LUA->CheckType(-2, Type::Vector); // Max
-	LUA->CheckType(-3, Type::Table); // Sorted verts
+	LUA->CheckType(-1, Type::Vector); // Max
+	LUA->CheckType(-2, Type::Vector); // Min
+	LUA->CheckType(-3, Type::Table);  // Sorted verts
 
+	//obbminmax
 	Vector maxV = LUA->GetVector();
 	Vector minV = LUA->GetVector(-2);
-
 	float minFloat[3] = { minV.x, minV.y, minV.z };
 	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
+	LUA->Pop(2); //pop off min & max
 
-	LUA->Pop(2);	//pop off min max
+	//create prop & generate mesh
+	Prop newProp = Prop{};
+	newProp.meshID = calcMesh(LUA, minFloat, maxFloat, LUA->ObjLen(), &newProp);
+	newProp.pos = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+	newProp.ang = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
+	newProp.lastPos = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+	newProp.lastAng = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
+	newProp.ID = propCount;
+	props.push_back(newProp);
 
-	size_t tableLen = LUA->ObjLen();
-	NvFlexBuffer* worldVerts = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(float4), eNvFlexBufferHost);
-	NvFlexBuffer* worldIndices = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(int), eNvFlexBufferHost);
-
-	float4* hostVerts = static_cast<float4*>(NvFlexMap(worldVerts, eNvFlexMapWait));
-	int* hostIndices = static_cast<int*>(NvFlexMap(worldIndices, eNvFlexMapWait));
-
-	//loop through map verticies
-	for (int i = 0; i < tableLen; i++) {
-
-		//lua is 1 indexed, C++ is 0 indexed
-		LUA->PushNumber(i + 1);
-
-		//gets data from table at the number ontop of the stack
-		LUA->GetTable(-2);
-
-		if (LUA->GetType(-1) == GarrysMod::Lua::Type::Nil) break;
-
-		//returns vector at -1 stack pos
-		Vector thisPos = LUA->GetVector();
-
-		float4 vert;
-		vert.x = thisPos.x;
-		vert.y = thisPos.y;
-		vert.z = thisPos.z;
-		vert.w = 0.5f;
-
-		hostVerts[i] = vert;
-		hostIndices[i] = i;
-
-		//counter clockwise -> clockwise triangle winding
-		//if (i % 3 == 1) {
-		//	int host = hostIndices[i];
-		//	hostIndices[i] = hostIndices[i - 1];
-		//	hostIndices[i - 1] = host;
-
-		//}
-
-		//remove the vector from the table
-		LUA->Pop();
-	}
-
-	// Pop off the nil
-	LUA->Pop();
-
-	NvFlexUnmap(worldVerts);
-	NvFlexUnmap(worldIndices);
-
+	//map buffers
 	NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
 	float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
 	float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
+	float4* prevPositions = static_cast<float4*>(NvFlexMap(geoPrevPosBuffer, 0));
+	float4* prevRotations = static_cast<float4*>(NvFlexMap(geoPrevQuatBuffer, 0));
 	int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
 
-	// create the triangle mesh
-	worldMesh = NvFlexCreateTriangleMesh(flexLibrary);
-	NvFlexUpdateTriangleMesh(flexLibrary, worldMesh, worldVerts, worldIndices, tableLen, tableLen / 3, minFloat, maxFloat);
-
 	// add triangle mesh
-	flags[0] = NvFlexMakeShapeFlags(eNvFlexShapeTriangleMesh, false);
-	geometry[0].triMesh.mesh = worldMesh;
-	geometry[0].triMesh.scale[0] = 1.0f;
-	geometry[0].triMesh.scale[1] = 1.0f;
-	geometry[0].triMesh.scale[2] = 1.0f;
-	positions[0] = float4{ 0.0f, 0.0f, 0.f, 0.5f }; //0,0,-12000 IS FLATGRASS PLANE POSITION!
-	rotations[0] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+	flags[propCount] = NvFlexMakeShapeFlags(eNvFlexShapeTriangleMesh, propCount != 0);	//index 0 is ALWAYS the world
+	geometry[propCount].triMesh.mesh = newProp.meshID;
+	geometry[propCount].triMesh.scale[0] = 1.0f;
+	geometry[propCount].triMesh.scale[1] = 1.0f;
+	geometry[propCount].triMesh.scale[2] = 1.0f;
+	positions[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.0f }; 
+	rotations[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.01f };	//NEVER SET ROTATION TO 0,0,0,0, FLEX *HATES* IT!
 
-	for (int i = 0; i < pow(2, 8); i++) {	//idk why this works, just make sure the count of 'i' is like 2x greater than the max collision amount
-		positions[i] = float4{ 0.0f, 0.0f, 0.0f, 1.f };
-	}
+	prevPositions[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
+	prevRotations[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
 
 	// unmap buffers
+
 	NvFlexUnmap(geometryBuffer);
 	NvFlexUnmap(geoPosBuffer);
 	NvFlexUnmap(geoQuatBuffer);
+	NvFlexUnmap(geoPrevPosBuffer);
+	NvFlexUnmap(geoPrevQuatBuffer);
 	NvFlexUnmap(geoFlagsBuffer);
 
-	//world mesh
-	propCount+=1;
+	//other
+	propCount += 1;
 
-	printLua("[GWATER]: Added world mesh");
+	printLua("[GWATER]: Added mesh " + std::to_string(propCount));
 
+	LUA->PushNumber(propCount - 1);
+	return 1;
+
+}
+
+LUA_FUNCTION(SetMeshPos) {
+
+	LUA->CheckType(-1, Type::Number); // ID
+	LUA->CheckType(-2, Type::Vector); // Pos
+
+	LUA->CheckType(-3, Type::Vector); // Ang xyz
+	LUA->CheckType(-4, Type::Number); // Ang w
+
+	int id = static_cast<int>(LUA->GetNumber());
+	Vector gmodPos = LUA->GetVector(-2);
+	Vector gmodAng = LUA->GetVector(-3);
+	float gmodAngZ = static_cast<float>(LUA->GetNumber(-4));
+
+	//feels kinda hacky, any ideas andrew?
+	for (Prop& prop : props) {
+		if (prop.ID == id) {
+			prop.lastPos = float4{ gmodPos.x, gmodPos.y, gmodPos.z, 1.f / 50000.f };
+			prop.lastAng = float4{ gmodAng.x, gmodAng.y, gmodAng.z, gmodAngZ };
+			break;
+
+		}
+
+	}
+
+	LUA->Pop(4);	//pop id, pos
+	return 0;
+
+}
+
+
+LUA_FUNCTION(RemoveMesh) {
+
+	LUA->CheckType(-1, Type::Number); // ID
+	int id = static_cast<int>(LUA->GetNumber());
+
+	for (int i = 0; i < props.size(); i++) {
+		if (props[i].ID == id) {
+
+			NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
+			float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
+			float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
+			int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
+
+			//positions[i] = NULL;
+
+			NvFlexUnmap(geometryBuffer);
+			NvFlexUnmap(geoPosBuffer);
+			NvFlexUnmap(geoQuatBuffer);
+			NvFlexUnmap(geoFlagsBuffer);
+			props.erase(props.begin() + i, props.begin() + i + 1);
+			break;
+
+		}
+
+	}
+
+	LUA->Pop(1);	//pop id, pos
 	return 0;
 
 }
@@ -256,10 +336,11 @@ GMOD_MODULE_OPEN()
 	LUA->CreateTable();
 	ADD_GWATER_FUNC(GetData, "GetData");
 	ADD_GWATER_FUNC(DeleteSimulation, "DeleteSimulation");
-	ADD_GWATER_FUNC(AddWorldMesh, "AddWorldMesh");
+	ADD_GWATER_FUNC(AddMesh, "AddMesh");
 	ADD_GWATER_FUNC(AddParticle, "SpawnParticle");
 	ADD_GWATER_FUNC(RemoveAllParticles, "RemoveAll");
 	ADD_GWATER_FUNC(SetRadius, "SetRadius");
+	ADD_GWATER_FUNC(SetMeshPos, "SetMeshPos");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); //remove _G
@@ -278,6 +359,9 @@ GMOD_MODULE_OPEN()
 	geoPosBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(float4), eNvFlexBufferHost);
 	geoFlagsBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(int), eNvFlexBufferHost);
 	geoQuatBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(float4), eNvFlexBufferHost);
+
+	geoPrevPosBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(float4), eNvFlexBufferHost);
+	geoPrevQuatBuffer = NvFlexAllocBuffer(flexLibrary, MAX_COLLIDERS, sizeof(float4), eNvFlexBufferHost);
 
 	// Host buffer
 	particleBufferHost = static_cast<float4*>(malloc(sizeof(float4) * flexSolverDesc.maxParticles));

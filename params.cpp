@@ -17,15 +17,14 @@ NvFlexBuffer* geoFlagsBuffer;
 NvFlexBuffer* geoPosBuffer;
 NvFlexBuffer* geoQuatBuffer;
 
-NvFlexBuffer* indicesBuffer;
-NvFlexBuffer* lengthsBuffer;
-NvFlexBuffer* coefficientsBuffer;
+NvFlexBuffer* geoPrevPosBuffer;
+NvFlexBuffer* geoPrevQuatBuffer;
 
 NvFlexParams* flexParams;
 NvFlexSolverDesc flexSolverDesc;
-NvFlexTriangleMeshId worldMesh;
 
 std::vector<Particle> particleQueue;
+std::vector<Prop> props;
 GarrysMod::Lua::ILuaBase* GlobalLUA;
 
 std::mutex* bufferMutex;
@@ -34,6 +33,7 @@ float4* particleBufferHost;
 int numParticles = 0;
 int propCount = 0;
 bool simValid = true;
+
 bool flexRemoveQueue = false;
 
 void initParams(NvFlexParams* params, float r) {
@@ -47,29 +47,29 @@ void initParams(NvFlexParams* params, float r) {
 
 	params->radius = r;
 	params->viscosity = 0.0f;
-	params->dynamicFriction = 5/r;
-	params->staticFriction = 0.0f;
+	params->dynamicFriction = 5 / r;	//5/r
+	params->staticFriction = 5 / r;
 	params->particleFriction = 0.01f; // scale friction between particles by default
 	params->freeSurfaceDrag = 0.0f;
 	params->drag = 0.0f;
 	params->lift = 1.0f;
-	params->numIterations = 4;
-	params->fluidRestDistance = params->radius * 0.7f;
-	params->solidRestDistance = 5.f;
+	params->numIterations = 3;
+	params->fluidRestDistance = r * 0.75f;
+	params->solidRestDistance = r * 0.5f;
 
 	params->anisotropyScale = 0.0f;
 	params->anisotropyMin = 0.0f;
 	params->anisotropyMax = 0.0f;
 	params->smoothing = 0.0f;
 
-	params->dissipation = 0.0f;
+	params->dissipation = 0.01f;
 	params->damping = 0.0f;
 	params->particleCollisionMargin = 0.f;
-	params->shapeCollisionMargin = 1.f;
-	params->collisionDistance = params->radius * 0.25f; // Needed for tri-particle intersection
+	params->shapeCollisionMargin = r * 0.1;
+	params->collisionDistance = r * 0.25f; // Needed for tri-particle intersection
 	params->sleepThreshold = 0.1f;
 	params->shockPropagation = 0.0f;
-	params->restitution = 0.0f;
+	params->restitution = 1.0f;
 
 	params->maxSpeed = FLT_MAX;
 	params->maxAcceleration = 100.0f;	// approximately 10x gravity

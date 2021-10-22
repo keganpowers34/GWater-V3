@@ -19,7 +19,13 @@ void flexSolveThread() {
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(simFramerateMi));
 
-		if (numParticles < 1 && particleQueue.size() < 1) continue;
+		if (numParticles < 1 && particleQueue.size() < 1) {
+			//float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
+			//for (int i = 0; i < 4000; i++) positions[i] = float4{ 0.0f, 0.0f, 0.0f, 0.5f };
+			//NvFlexUnmap(geoPosBuffer);
+
+			continue;
+		}
 
 		bufferMutex->lock();
 
@@ -64,6 +70,33 @@ void flexSolveThread() {
 
 		}
 
+		//update positions of props
+		float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
+		float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
+
+		float4* prevPositions = static_cast<float4*>(NvFlexMap(geoPrevPosBuffer, 0));
+		float4* prevRotations = static_cast<float4*>(NvFlexMap(geoPrevQuatBuffer, 0));
+
+		for (Prop& prop : props) {
+			positions[prop.ID] = prop.pos;
+			rotations[prop.ID] = prop.ang;
+
+			prevPositions[prop.ID] = prop.lastPos;
+			prevRotations[prop.ID] = prop.lastAng;
+
+			prop.pos = prop.lastPos;
+			prop.ang = prop.lastAng;
+			
+
+
+		}
+
+		NvFlexUnmap(geoPrevPosBuffer);
+		NvFlexUnmap(geoPrevQuatBuffer);
+
+		NvFlexUnmap(geoPosBuffer);
+		NvFlexUnmap(geoQuatBuffer);
+
 		particleQueue.clear();
 		
 		//copy particle positions (gpu memory fuckery)
@@ -81,10 +114,10 @@ void flexSolveThread() {
 		NvFlexSetPhases(flexSolver, phaseBuffer, NULL);
 		NvFlexSetActive(flexSolver, activeBuffer, NULL);
 		NvFlexSetActiveCount(flexSolver, numParticles);
-		NvFlexSetShapes(flexSolver, geometryBuffer, geoPosBuffer, geoQuatBuffer, NULL, NULL, geoFlagsBuffer, propCount);	//doesnt work??
+		NvFlexSetShapes(flexSolver, geometryBuffer, geoPosBuffer, geoQuatBuffer, geoPrevPosBuffer, geoPrevQuatBuffer, geoFlagsBuffer, propCount);
 
 		// tick the solver (5 times the default looks about right -potato)
-		NvFlexUpdateSolver(flexSolver, simFramerate * 5, 4, false);
+		NvFlexUpdateSolver(flexSolver, simFramerate * 8, 3, false);
 
 		// read back (async)
 		NvFlexGetParticles(flexSolver, particleBuffer, NULL);

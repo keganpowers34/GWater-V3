@@ -19,15 +19,14 @@ extern NvFlexBuffer* geoFlagsBuffer;
 extern NvFlexBuffer* geoPosBuffer;
 extern NvFlexBuffer* geoQuatBuffer;
 
-extern NvFlexBuffer* indicesBuffer;
-extern NvFlexBuffer* lengthsBuffer;
-extern NvFlexBuffer* coefficientsBuffer;
+extern NvFlexBuffer* geoPrevPosBuffer;
+extern NvFlexBuffer* geoPrevQuatBuffer;
 
 extern NvFlexParams* flexParams;
 extern NvFlexSolverDesc flexSolverDesc;
-extern NvFlexTriangleMeshId worldMesh;
 
 extern std::vector<Particle> particleQueue;
+extern std::vector<Prop> props;
 extern GarrysMod::Lua::ILuaBase* GlobalLUA;
 
 extern std::mutex* bufferMutex;
@@ -36,6 +35,7 @@ extern float4* particleBufferHost;
 extern int numParticles;
 extern int propCount;
 extern bool simValid;
+
 extern bool flexRemoveQueue;
 
 

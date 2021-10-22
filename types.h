@@ -16,5 +16,13 @@ struct Prop {
     NvFlexBuffer* verts;
     NvFlexBuffer* indices;
     NvFlexTriangleMeshId meshID;
+    
+    float4 pos;
+    float4 lastPos;
+
+    float4 ang;
+    float4 lastAng;
+
+    int ID;
 };
 
