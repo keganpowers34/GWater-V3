@@ -23,14 +23,12 @@ void flexAPI::calcMesh(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, con
     for (int i = 0; i < tableLen; i++) {
 
         //lua is 1 indexed, C++ is 0 indexed
-        LUA->PushNumber(i + 1);
+        LUA->PushNumber(i + 1.0);
 
         //gets data from table at the number ontop of the stack
         LUA->GetTable(-2);
 
-        //returns vector at -1 stack pos
         Vector thisPos = LUA->GetVector();
-
         float4 vert;
         vert.x = thisPos.x;
         vert.y = thisPos.y;
@@ -104,6 +102,31 @@ void flexAPI::addParticle(Vector pos, Vector vel) {
 
 }
 
+void flexAPI::freeProp(int ID) {
+
+    for (int i = ID; i < propCount; i++) {
+
+        NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
+        float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
+        float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
+        int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
+
+        geometry[i] = geometry[i + 1];
+        positions[i] = positions[i + 1];
+        rotations[i] = rotations[i + 1];
+        flags[i] = flags[i + 1];
+
+        props[i].ID = props[i].ID - 1;
+
+        NvFlexUnmap(geometryBuffer);
+        NvFlexUnmap(geoPosBuffer);
+        NvFlexUnmap(geoQuatBuffer);
+        NvFlexUnmap(geoFlagsBuffer);
+
+    }
+
+
+}
 
 //flex startup
 flexAPI::flexAPI() {
@@ -148,11 +171,13 @@ flexAPI::flexAPI() {
 //flex shutdown
 flexAPI::~flexAPI() {
     simValid = false;
+    numParticles = 0;
+    propCount = 0;
 
-    GlobalLUA->PushSpecial(GarrysMod::Lua::SPECIAL_GLOB);
-    GlobalLUA->PushNil();
-    GlobalLUA->SetField(-2, "gwater");
-    GlobalLUA->Pop(); // pop _G
+    //GlobalLUA->PushSpecial(GarrysMod::Lua::SPECIAL_GLOB);
+    //GlobalLUA->PushNil();
+    //GlobalLUA->SetField(-2, "gwater");
+    //GlobalLUA->Pop(); // pop _G
 
     if (flexLibrary != nullptr) {
         bufferMutex->lock();
@@ -168,7 +193,7 @@ flexAPI::~flexAPI() {
         NvFlexFreeBuffer(geoPrevPosBuffer);
         NvFlexFreeBuffer(geoPrevQuatBuffer);
 
-
+        
         delete flexParams;
 
         free(particleBufferHost);

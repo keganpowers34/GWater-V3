@@ -54,8 +54,8 @@ LUA_FUNCTION(RemoveAllParticles) {
 
 LUA_FUNCTION(SetRadius) {
 	LUA->CheckType(-1, Type::Number);
-	initParams(flexLib->flexParams, static_cast<float>(LUA->GetNumber()));
-	NvFlexSetParams(flexLib->flexSolver, flexLib->flexParams);
+	//initParams(flexLib->flexParams, static_cast<float>(LUA->GetNumber()));
+	//NvFlexSetParams(flexLib->flexSolver, flexLib->flexParams);
 	return 0;
 
 }
@@ -140,38 +140,27 @@ LUA_FUNCTION(SetMeshPos) {
 
 }
 
-/*
+
 LUA_FUNCTION(RemoveMesh) {
 
 	LUA->CheckType(-1, Type::Number); // ID
 	int id = static_cast<int>(LUA->GetNumber());
 
-	for (int i = 0; i < props.size(); i++) {
-		if (props[i].ID == id) {
+	NvFlexFreeBuffer(props[id].verts);
+	NvFlexFreeBuffer(props[id].indices);
 
-			NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
-			float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
-			float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
-			int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
+	flexLib->freeProp(id);
+	props.erase(props.begin() + id, props.begin() + id + 1);
 
-			//memset(positions[i], 0, 16);
+	propCount--;
 
-			NvFlexUnmap(geometryBuffer);
-			NvFlexUnmap(geoPosBuffer);
-			NvFlexUnmap(geoQuatBuffer);
-			NvFlexUnmap(geoFlagsBuffer);
-			props.erase(props.begin() + i, props.begin() + i + 1);
-			break;
+	LUA->Pop();	//pop id
 
-		}
-
-	}
-
-	LUA->Pop(1);	//pop id, pos
+	printLua("Removed mesh id " + std::to_string(id));
 	return 0;
 
 }
-*/
+
 
 
 
@@ -188,6 +177,7 @@ GMOD_MODULE_OPEN()
 	ADD_GWATER_FUNC(RemoveAllParticles, "RemoveAll");
 	ADD_GWATER_FUNC(SetRadius, "SetRadius");
 	ADD_GWATER_FUNC(SetMeshPos, "SetMeshPos");
+	ADD_GWATER_FUNC(RemoveMesh, "RemoveMesh");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); //remove _G
@@ -202,7 +192,7 @@ GMOD_MODULE_OPEN()
 // Called when the module is unloaded
 GMOD_MODULE_CLOSE()
 {
-	//remove flexLib;
+	flexLib.reset();
 
 	return 0;
 

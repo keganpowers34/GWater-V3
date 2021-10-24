@@ -35,7 +35,7 @@ struct Prop {
 
 
 class flexAPI {
-public:
+
     NvFlexLibrary* flexLibrary;
     NvFlexSolver* flexSolver;
 
@@ -55,9 +55,11 @@ public:
     NvFlexParams* flexParams;
     NvFlexSolverDesc flexSolverDesc;
 
+public:
     void addParticle(Vector pos, Vector vel);
     void calcMesh(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen, Prop* p);
     void flexSolveThread();
+    void freeProp(int ID);
     flexAPI();
     ~flexAPI();
 

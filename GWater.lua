@@ -130,10 +130,14 @@ hook.Add("PostDrawOpaqueRenderables", "bruh", function()
 	end
 
 	for _, mesh in ipairs(meshes) do
-			if not mesh[1]:IsValid() then continue end
+				print("anything at all")
+			if not mesh[1] then 
+				gwater.RemoveMesh(mesh[2])
+				continue 
+			end
 
 			local newQuat = unfuckQuat( quatFromAngle( mesh[1]:GetAngles() ) )
-			gwater.SetMeshPos(newQuat[4], Vector(newQuat[1], newQuat[2], newQuat[3]), mesh[1]:GetPos(), mesh[2]);
+			//gwater.SetMeshPos(newQuat[4], Vector(newQuat[1], newQuat[2], newQuat[3]), mesh[1]:GetPos(), mesh[2]);
 
 	end
 
