@@ -1,28 +1,11 @@
-#include "declarations.h"
 #include <NvFlex.h>
 #include <NvFlexExt.h>
 #include <NvFlexDevice.h>
+
+#include "declarations.h"
 #include <float.h>
 
-NvFlexLibrary* flexLibrary;
-NvFlexSolver* flexSolver;
-
-NvFlexBuffer* particleBuffer;
-NvFlexBuffer* velocityBuffer;
-NvFlexBuffer* phaseBuffer;
-NvFlexBuffer* activeBuffer;
-
-NvFlexBuffer* geometryBuffer;
-NvFlexBuffer* geoFlagsBuffer;
-NvFlexBuffer* geoPosBuffer;
-NvFlexBuffer* geoQuatBuffer;
-
-NvFlexBuffer* geoPrevPosBuffer;
-NvFlexBuffer* geoPrevQuatBuffer;
-
-NvFlexParams* flexParams;
-NvFlexSolverDesc flexSolverDesc;
-
+std::shared_ptr<flexAPI> flexLib;
 std::vector<Particle> particleQueue;
 std::vector<Prop> props;
 GarrysMod::Lua::ILuaBase* GlobalLUA;

@@ -1,11 +1,13 @@
+#include <NvFlex.h>
+#include <NvFlexExt.h>
+#include <NvFlexDevice.h>
+
 #include "declarations.h"
 #include "types.h"
 #include <string>
-#include <NvFlex.h>
-#include <NvFlexExt.h>
 #include <random>
 
-void flexSolveThread() {
+void flexAPI::flexSolveThread() {
 
 	//declarations
 	float simFramerate = 1.f / 60.f;	
@@ -20,10 +22,6 @@ void flexSolveThread() {
 		std::this_thread::sleep_for(std::chrono::milliseconds(simFramerateMi));
 
 		if (numParticles < 1 && particleQueue.size() < 1) {
-			//float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
-			//for (int i = 0; i < 4000; i++) positions[i] = float4{ 0.0f, 0.0f, 0.0f, 0.5f };
-			//NvFlexUnmap(geoPosBuffer);
-
 			continue;
 		}
 
@@ -65,7 +63,6 @@ void flexSolveThread() {
 			phases[numParticles] = NvFlexMakePhase(0, eNvFlexPhaseSelfCollide | eNvFlexPhaseFluid);
 			activeIndices[numParticles] = numParticles;
 
-			//add 1 particle
 			numParticles++;
 
 		}
