@@ -21,7 +21,7 @@ void flexAPI::flexSolveThread() {
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(simFramerateMi));
 
-		if (numParticles < 1 && particleQueue.size() < 1) {
+		if (numParticles < 1 && particleQueue.size() < 0) {
 			continue;
 		}
 
@@ -74,15 +74,16 @@ void flexAPI::flexSolveThread() {
 		float4* prevPositions = static_cast<float4*>(NvFlexMap(geoPrevPosBuffer, 0));
 		float4* prevRotations = static_cast<float4*>(NvFlexMap(geoPrevQuatBuffer, 0));
 
-		for (Prop& prop : props) {
-			positions[prop.ID] = prop.pos;
-			rotations[prop.ID] = prop.ang;
+		//start at 1 because world never moves
+		for (int i = 1; i < props.size(); i++) {
+			positions[i] = props[i].pos;
+			rotations[i] = props[i].ang;
 
-			prevPositions[prop.ID] = prop.lastPos;
-			prevRotations[prop.ID] = prop.lastAng;
+			prevPositions[i] = props[i].lastPos;
+			prevRotations[i] = props[i].lastAng;
 
-			prop.pos = prop.lastPos;
-			prop.ang = prop.lastAng;
+			props[i].pos = props[i].lastPos;
+			props[i].ang = props[i].lastAng;
 			
 
 

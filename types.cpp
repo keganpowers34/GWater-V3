@@ -1,7 +1,7 @@
 #include "types.h"
 #include "declarations.h"
 
-#define MAX_COLLIDERS 1000
+#define MAX_COLLIDERS 1024
 
 //tysm this was very useful for debugging
 void gjelly_error(NvFlexErrorSeverity type, const char* msg, const char* file, int line) {
@@ -23,7 +23,7 @@ void flexAPI::calcMesh(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, con
     for (int i = 0; i < tableLen; i++) {
 
         //lua is 1 indexed, C++ is 0 indexed
-        LUA->PushNumber(i + 1.0);
+        LUA->PushNumber(static_cast<double>(i) + 1.0);
 
         //gets data from table at the number ontop of the stack
         LUA->GetTable(-2);
@@ -63,8 +63,6 @@ void flexAPI::calcMesh(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, con
     p->ang = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
     p->lastPos = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
     p->lastAng = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
-    p->ID = propCount;
-    p->meshID = generatedMesh;
 
     // Add data to BUFFERS
     NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
@@ -97,6 +95,7 @@ void flexAPI::calcMesh(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, con
 
 //add a particle to flex
 void flexAPI::addParticle(Vector pos, Vector vel) {
+    if (numParticles > flexSolverDesc.maxParticles) return;
     Particle particle = { float4{ pos.x, pos.y, pos.z , 0.5}, float3{vel.x, vel.y, vel.z} };
     particleQueue.push_back(particle);
 
@@ -104,27 +103,32 @@ void flexAPI::addParticle(Vector pos, Vector vel) {
 
 void flexAPI::freeProp(int ID) {
 
+    NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
+    float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
+    float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
+    int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
+    float4* prevPositions = static_cast<float4*>(NvFlexMap(geoPrevPosBuffer, 0));
+    float4* prevRotations = static_cast<float4*>(NvFlexMap(geoPrevQuatBuffer, 0));
+
     for (int i = ID; i < propCount; i++) {
+        int nextIndex = i + 1;
 
-        NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
-        float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
-        float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
-        int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
+        geometry[i] = geometry[nextIndex];
+        positions[i] = positions[nextIndex];
+        prevPositions[i] = prevPositions[nextIndex];
+        rotations[i] = rotations[nextIndex];
+        prevRotations[i] = prevRotations[nextIndex];
+        flags[i] = flags[nextIndex];
 
-        geometry[i] = geometry[i + 1];
-        positions[i] = positions[i + 1];
-        rotations[i] = rotations[i + 1];
-        flags[i] = flags[i + 1];
-
-        props[i].ID = props[i].ID - 1;
-
-        NvFlexUnmap(geometryBuffer);
-        NvFlexUnmap(geoPosBuffer);
-        NvFlexUnmap(geoQuatBuffer);
-        NvFlexUnmap(geoFlagsBuffer);
-
+        props[i] = props[nextIndex];
     }
 
+    NvFlexUnmap(geoPrevPosBuffer);
+    NvFlexUnmap(geoPrevQuatBuffer);
+    NvFlexUnmap(geometryBuffer);
+    NvFlexUnmap(geoPosBuffer);
+    NvFlexUnmap(geoQuatBuffer);
+    NvFlexUnmap(geoFlagsBuffer);
 
 }
 
@@ -193,6 +197,12 @@ flexAPI::~flexAPI() {
         NvFlexFreeBuffer(geoPrevPosBuffer);
         NvFlexFreeBuffer(geoPrevQuatBuffer);
 
+        for (Prop prop : props) {
+            NvFlexFreeBuffer(prop.verts);
+            NvFlexFreeBuffer(prop.indices);
+
+            NvFlexDestroyTriangleMesh(flexLibrary, prop.meshID);
+        }
         
         delete flexParams;
 

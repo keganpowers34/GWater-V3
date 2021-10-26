@@ -36,7 +36,7 @@ void initParams(NvFlexParams* params, float r) {
 	params->freeSurfaceDrag = 0.0f;
 	params->drag = 0.0f;
 	params->lift = 1.0f;
-	params->numIterations = 3;
+	params->numIterations = 2;
 	params->fluidRestDistance = r * 0.75f;
 	params->solidRestDistance = r * 0.5f;
 
@@ -60,7 +60,7 @@ void initParams(NvFlexParams* params, float r) {
 	params->relaxationFactor = 1.0f;
 	params->solidPressure = 1.0f;
 	params->adhesion = 0.0f;
-	params->cohesion = 0.005f;
+	params->cohesion = 0.01f;
 	params->surfaceTension = 0.0f;
 	params->vorticityConfinement = 0.0f;
 	params->buoyancy = 1.0f;

@@ -29,8 +29,6 @@ struct Prop {
 
     float4 ang;
     float4 lastAng;
-
-    int ID;
 };
 
 

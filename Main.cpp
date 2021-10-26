@@ -97,15 +97,17 @@ LUA_FUNCTION(AddMesh) {
 	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
 	LUA->Pop(2); //pop off min & max
 
+	bufferMutex->lock();
 	//add data to PROP & generate mesh
 	Prop newProp = Prop{};
 	flexLib->calcMesh(LUA, minFloat, maxFloat, LUA->ObjLen(), &newProp);
 	props.push_back(newProp);
+	bufferMutex->unlock();
 
 	//other
-	propCount += 1;
 	printLua("[GWATER]: Added mesh " + std::to_string(propCount));
-	LUA->PushNumber(propCount - 1);	//id of mesh
+	LUA->PushNumber(propCount);	//id of mesh
+	propCount += 1;
 
 	return 1;
 
@@ -119,21 +121,13 @@ LUA_FUNCTION(SetMeshPos) {
 	LUA->CheckType(-3, Type::Vector); // Ang xyz
 	LUA->CheckType(-4, Type::Number); // Ang w
 
-	int id = static_cast<int>(LUA->GetNumber());
+	int id = static_cast<int>(LUA->GetNumber());	//lua is 1 indexed
 	Vector gmodPos = LUA->GetVector(-2);
 	Vector gmodAng = LUA->GetVector(-3);
 	float gmodAngZ = static_cast<float>(LUA->GetNumber(-4));
 
-	//feels kinda hacky, any ideas andrew?
-	for (Prop& prop : props) {
-		if (prop.ID == id) {
-			prop.lastPos = float4{ gmodPos.x, gmodPos.y, gmodPos.z, 1.f / 50000.f };
-			prop.lastAng = float4{ gmodAng.x, gmodAng.y, gmodAng.z, gmodAngZ };
-			break;
-
-		}
-
-	}
+	props[id].lastPos = float4{ gmodPos.x, gmodPos.y, gmodPos.z, 1.f / 50000.f };
+	props[id].lastAng = float4{ gmodAng.x, gmodAng.y, gmodAng.z, gmodAngZ };
 
 	LUA->Pop(4);	//pop id, pos, ang and angw
 	return 0;
@@ -144,19 +138,27 @@ LUA_FUNCTION(SetMeshPos) {
 LUA_FUNCTION(RemoveMesh) {
 
 	LUA->CheckType(-1, Type::Number); // ID
-	int id = static_cast<int>(LUA->GetNumber());
+	int id = static_cast<int>(LUA->GetNumber());	
 
-	NvFlexFreeBuffer(props[id].verts);
-	NvFlexFreeBuffer(props[id].indices);
+	bufferMutex->lock();
+
+	Prop* prop = &props[id];
+
+	NvFlexFreeBuffer(prop->verts);
+	NvFlexFreeBuffer(prop->indices);
 
 	flexLib->freeProp(id);
-	props.erase(props.begin() + id, props.begin() + id + 1);
+
+	printLua(std::to_string(id));
+	props.pop_back();
 
 	propCount--;
 
+	bufferMutex->unlock();
+
 	LUA->Pop();	//pop id
 
-	printLua("Removed mesh id " + std::to_string(id));
+	//printLua("Removed mesh id " + std::to_string(id));
 	return 0;
 
 }
@@ -192,7 +194,9 @@ GMOD_MODULE_OPEN()
 // Called when the module is unloaded
 GMOD_MODULE_CLOSE()
 {
+
 	flexLib.reset();
+	props.clear();
 
 	return 0;
 
