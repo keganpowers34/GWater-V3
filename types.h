@@ -3,7 +3,7 @@
 #include <NvFlex.h>
 #include <NvFlexExt.h>
 #include <NvFlexDevice.h>
-
+#include <vector>
 #include "GarrysMod/Lua/Interface.h"
 
 struct float4 {
@@ -29,6 +29,8 @@ struct Prop {
 
     float4 ang;
     float4 lastAng;
+
+    bool isConvex;
 };
 
 
@@ -54,10 +56,14 @@ class flexAPI {
     NvFlexSolverDesc flexSolverDesc;
 
 public:
+    std::vector<Prop> props;
+
     void addParticle(Vector pos, Vector vel);
-    void calcMesh(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen, Prop* p);
+    void calcMeshConcave(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen);
     void flexSolveThread();
     void freeProp(int ID);
+    void initParams(float r);
+    void calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen);
     flexAPI();
     ~flexAPI();
 

@@ -84,8 +84,6 @@ void flexAPI::flexSolveThread() {
 
 			props[i].pos = props[i].lastPos;
 			props[i].ang = props[i].lastAng;
-			
-
 
 		}
 
@@ -113,6 +111,7 @@ void flexAPI::flexSolveThread() {
 		NvFlexSetActive(flexSolver, activeBuffer, NULL);
 		NvFlexSetActiveCount(flexSolver, numParticles);
 		NvFlexSetShapes(flexSolver, geometryBuffer, geoPosBuffer, geoQuatBuffer, geoPrevPosBuffer, geoPrevQuatBuffer, geoFlagsBuffer, propCount);
+		NvFlexSetParams(flexSolver, flexParams);
 
 		// tick the solver (5 times the default looks about right -potato)
 		NvFlexUpdateSolver(flexSolver, simFramerate * 8, 3, false);

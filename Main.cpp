@@ -54,8 +54,7 @@ LUA_FUNCTION(RemoveAllParticles) {
 
 LUA_FUNCTION(SetRadius) {
 	LUA->CheckType(-1, Type::Number);
-	//initParams(flexLib->flexParams, static_cast<float>(LUA->GetNumber()));
-	//NvFlexSetParams(flexLib->flexSolver, flexLib->flexParams);
+	flexLib->initParams(static_cast<float>(LUA->GetNumber()));
 	return 0;
 
 }
@@ -99,13 +98,21 @@ LUA_FUNCTION(AddMesh) {
 
 	bufferMutex->lock();
 	//add data to PROP & generate mesh
-	Prop newProp = Prop{};
-	flexLib->calcMesh(LUA, minFloat, maxFloat, LUA->ObjLen(), &newProp);
-	props.push_back(newProp);
+	size_t len = LUA->ObjLen();
+	if (len / 3 < 64) {
+		flexLib->calcMeshConvex(LUA, minFloat, maxFloat, LUA->ObjLen());
+		printLua("[GWATER]: Added convex mesh " + std::to_string(propCount));
+	}
+	else {
+		flexLib->calcMeshConcave(LUA, minFloat, maxFloat, LUA->ObjLen());
+
+		printLua("[GWATER]: Added concave mesh " + std::to_string(propCount));
+	}
+	
 	bufferMutex->unlock();
 
 	//other
-	printLua("[GWATER]: Added mesh " + std::to_string(propCount));
+	
 	LUA->PushNumber(propCount);	//id of mesh
 	propCount += 1;
 
@@ -124,10 +131,10 @@ LUA_FUNCTION(SetMeshPos) {
 	int id = static_cast<int>(LUA->GetNumber());	//lua is 1 indexed
 	Vector gmodPos = LUA->GetVector(-2);
 	Vector gmodAng = LUA->GetVector(-3);
-	float gmodAngZ = static_cast<float>(LUA->GetNumber(-4));
+	float gmodAngW = static_cast<float>(LUA->GetNumber(-4));
 
-	props[id].lastPos = float4{ gmodPos.x, gmodPos.y, gmodPos.z, 1.f / 50000.f };
-	props[id].lastAng = float4{ gmodAng.x, gmodAng.y, gmodAng.z, gmodAngZ };
+	flexLib->props[id].lastPos = float4{ gmodPos.x, gmodPos.y, gmodPos.z, 1.f / 50000.f };
+	flexLib->props[id].lastAng = float4{ gmodAng.x, gmodAng.y, gmodAng.z, gmodAngW };
 
 	LUA->Pop(4);	//pop id, pos, ang and angw
 	return 0;
@@ -142,23 +149,13 @@ LUA_FUNCTION(RemoveMesh) {
 
 	bufferMutex->lock();
 
-	Prop* prop = &props[id];
-
-	NvFlexFreeBuffer(prop->verts);
-	NvFlexFreeBuffer(prop->indices);
-
 	flexLib->freeProp(id);
-
-	printLua(std::to_string(id));
-	props.pop_back();
-
 	propCount--;
 
 	bufferMutex->unlock();
 
 	LUA->Pop();	//pop id
 
-	//printLua("Removed mesh id " + std::to_string(id));
 	return 0;
 
 }
@@ -177,9 +174,11 @@ GMOD_MODULE_OPEN()
 	ADD_GWATER_FUNC(AddMesh, "AddMesh");
 	ADD_GWATER_FUNC(AddParticle, "SpawnParticle");
 	ADD_GWATER_FUNC(RemoveAllParticles, "RemoveAll");
-	ADD_GWATER_FUNC(SetRadius, "SetRadius");
 	ADD_GWATER_FUNC(SetMeshPos, "SetMeshPos");
 	ADD_GWATER_FUNC(RemoveMesh, "RemoveMesh");
+
+	//param funcs
+	ADD_GWATER_FUNC(SetRadius, "SetRadius");
 
 	LUA->SetField(-2, "gwater");
 	LUA->Pop(); //remove _G
@@ -196,7 +195,12 @@ GMOD_MODULE_CLOSE()
 {
 
 	flexLib.reset();
-	props.clear();
+
+	//set .gwater to nil
+	LUA->PushSpecial(SPECIAL_GLOB);
+	LUA->PushNil();
+	LUA->SetField(-2, "gwater");
+	LUA->Pop(); // pop _G
 
 	return 0;
 
