@@ -99,6 +99,16 @@ LUA_FUNCTION(AddMesh) {
 	bufferMutex->lock();
 	//add data to PROP & generate mesh
 	size_t len = LUA->ObjLen();
+
+	//check to make sure the mesh is even valid (error models)
+	if (len < 1 || len % 3 != 0) {
+		bufferMutex->unlock();
+		printLua("[GWATER]: Invalid mesh given!!");
+		LUA->PushBool(false);
+
+		return 1;
+	}
+
 	if (len / 3 < 64) {
 		flexLib->calcMeshConvex(LUA, minFloat, maxFloat, LUA->ObjLen());
 		printLua("[GWATER]: Added convex mesh " + std::to_string(propCount));
@@ -112,9 +122,8 @@ LUA_FUNCTION(AddMesh) {
 	bufferMutex->unlock();
 
 	//other
-	
-	LUA->PushNumber(propCount);	//id of mesh
 	propCount += 1;
+	LUA->PushBool(true);
 
 	return 1;
 

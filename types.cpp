@@ -102,12 +102,12 @@ flexAPI::flexAPI() {
 
 //flex shutdown
 flexAPI::~flexAPI() {
+    bufferMutex->lock();
     simValid = false;
     numParticles = 0;
     propCount = 0;
 
     if (flexLibrary != nullptr) {
-        bufferMutex->lock();
 
         NvFlexFreeBuffer(particleBuffer);
         NvFlexFreeBuffer(velocityBuffer);
@@ -130,9 +130,9 @@ flexAPI::~flexAPI() {
 
         flexLibrary = nullptr;
 
-        bufferMutex->unlock();
-
-        delete bufferMutex;
-
     }
+
+    bufferMutex->unlock();
+
+    delete bufferMutex;
 }

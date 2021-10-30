@@ -57,10 +57,10 @@ void flexAPI::calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloa
         float d = cross.x * verts[0].x + cross.y * verts[0].y + cross.z * verts[0].z;
 
         //array of plane data
-        hostVerts[i / 3] = float4{ cross.x, cross.y, cross.z, d };
+        hostVerts[i / 3] = float4{ cross.x, cross.y, -cross.z, d };
 
         //debug
-        printLua(std::to_string(hostVerts[i / 3].x) + ", " + std::to_string(hostVerts[i / 3].y) + ", " + std::to_string(hostVerts[i / 3].z) + ", " + std::to_string(hostVerts[i / 3].w));
+        //printLua(std::to_string(hostVerts[i / 3].x) + ", " + std::to_string(hostVerts[i / 3].y) + ", " + std::to_string(hostVerts[i / 3].z) + ", " + std::to_string(hostVerts[i / 3].w));
     }
 
     LUA->Pop(); //pop table
