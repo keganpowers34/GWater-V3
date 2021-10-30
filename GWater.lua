@@ -1,13 +1,22 @@
-
-if not _G.gwater then
-	require("GWater_Rewrite")
-end
-
-
 local math_sin = math.sin
 local math_cos = math.cos
 local math_rad = math.rad
 
+local lp = LocalPlayer()
+local meshes = {}
+local data, particleCount
+local gwaterRadius = 10
+
+-- DEPTH BUFFER ACCESS --
+ 
+hook.Add("NeedsDepthPass", "depth_render", function() -- This hook is required to render depth buffers to access them
+    return true -- Render depth buffers
+end)
+ 
+local depthMat = CreateMaterial("depdtddsbuf_mat", "UnlitGeneric", {}) -- This creates a material to hold the depth buffer we will receive
+local depthTexture = render.GetResolvedFullFrameDepth() -- This acquires the ITexture object that holds the depth buffer data in pixels
+ 
+depthMat:SetTexture("$basetexture", depthTexture) -- This sets the material's texture to the depth buffer texture
 
 local function quatUnpack(q)
 	return q[1], q[2], q[3], q[4]
@@ -66,97 +75,137 @@ end
 --potatofunc
 local function addPropMesh(prop)
     local model = prop:GetModel()
-		if not util.GetModelMeshes(model) then print("INVALID MESH!") return end
+	if !util.GetModelMeshes(model) then print("[GWATER]: INVALID MESH!") return end
 
     local pos = prop:GetPos()
 
     local chonker_mesh = {}
 
-    for _, mesh in pairs( util.GetModelMeshes(model) ) do -- combine all model meshes into the chonker mesh
-        for _, tri in pairs( mesh.triangles ) do
-            table.insert( chonker_mesh, tri.pos )
-        end
+
+	
+
+	--vismesh
+    --for _, mesh in pairs( util.GetModelMeshes(model) ) do -- combine all model meshes into the chonker mesh
+    --    for _, tri in pairs( mesh.triangles ) do
+    --        table.insert( chonker_mesh, tri.pos )
+    --    end
+    --end
+	
+
+	--physmesh
+	prop:PhysicsInit(6)	--SOLID_VPHYSICS
+	for _, tri in pairs( prop:GetPhysicsObject():GetMesh() ) do 
+        table.insert( chonker_mesh, tri.pos )
     end
+	prop:PhysicsDestroy()	--just removes physmesh
 
     return gwater.AddMesh(chonker_mesh, prop:OBBMins() * 2, prop:OBBMaxs() * 2)
 
 end
 
+if(!_G.gwater)then
+	require("GWater_Rewrite")
 
---materials--
-local mblue = CreateMaterial( "shitter05", "UnlitGeneric", {
-  ["$basetexture"] = "phoenix_storms/blue_steel",
-})
-
-local mwhite = CreateMaterial( "shitter04", "UnlitGeneric", {
-  ["$basetexture"] = "lights/white",
-})
-
-
-GWATER_RADIUS = 10
---world mesh--
-gwater.AddMesh(triangulateWorld(), Vector(-33000, -33000, -33000), Vector(33000, 33000, 33000))
-
---loop through props--
-local meshes = {}
-local props = ents.GetAll()
-for i = 1, #props do
-		if props[i]:GetClass() == "prop_physics" then
-			table.insert(meshes, {props[i], addPropMesh(props[i])})
-
-		end
-
+	--world mesh--
+	gwater.AddMesh(triangulateWorld(), Vector(-33000, -33000, -33000), Vector(33000, 33000, 33000))
 end
 
+--material
+GWATER_MAT = Material("effects/circle2")		--phoenix_storms/blue_steel
 
-
-local data, particleCount
-local gwaterMat = Material("phoenix_storms/blue_steel")		--phoenix_storms/blue_steel
-
-local lp = LocalPlayer()
-
-hook.Add("PostDrawOpaqueRenderables", "bruh", function()
-
+--update particles
+hook.Add("Think", "GWATER_PARTICLE_UPDATE", function()
+	if(!lp or !lp:IsValid()) then return end
 	if(lp:Alive() and lp:GetActiveWeapon():GetClass() == "weapon_crowbar") then
+		--attack1
 		if lp:KeyDown(1) then
 			for i = 1, 10 do
-				gwater.SpawnParticle(LocalPlayer():GetPos() + Vector(0, 0, 63) + EyeVector() * 100 + VectorRand(-15, 15) , EyeVector() * 100)
+				gwater.SpawnParticle(LocalPlayer():GetPos() + Vector(0, 0, 63) + lp:EyeAngles():Forward() * 100 + VectorRand(-15, 15) , lp:EyeAngles():Forward() * 100)
 			end
 		end
 
+		--attack2
 		if lp:KeyDown(2048) then
+			gwater.SpawnParticle(LocalPlayer():GetPos() + Vector(0, 0, 63) + lp:EyeAngles():Forward() * 100 + VectorRand(-1, 1) , Vector())
+		end
+
+		--reload
+		if lp:KeyDown(8192) then
 			gwater.RemoveAll()
 		end
 	end
 
-	for _, mesh in ipairs(meshes) do
-				print("anything at all")
-			if not mesh[1] then 
-				gwater.RemoveMesh(mesh[2])
-				continue 
+	for i, mesh in ipairs(meshes) do
+			if !mesh:IsValid() then 
+				print("[GWATER]: Removing mesh " .. i)
+				gwater.RemoveMesh(i)
+				table.remove(meshes, i)
+				break
 			end
 
-			local newQuat = unfuckQuat( quatFromAngle( mesh[1]:GetAngles() ) )
-			//gwater.SetMeshPos(newQuat[4], Vector(newQuat[1], newQuat[2], newQuat[3]), mesh[1]:GetPos(), mesh[2]);
+			local newQuat = unfuckQuat( quatFromAngle( mesh:GetAngles() ) )
+			gwater.SetMeshPos(newQuat[4], Vector(newQuat[1], newQuat[2], newQuat[3]), mesh:GetPos(), i);
 
-	end
+			--mesh.LASTPOS = mesh.LASTPOS + (mesh:GetPos() - mesh.LASTPOS):GetNormalized()
 
-	data, particleCount = gwater.GetData()
-
-	render.SetMaterial(mwhite)
-	render.DrawSprite(Vector(0, 0, 0), 100, 100, Color( 255, 255, 255 ) )
-
-	render.SetMaterial(gwaterMat)
-	for i=1, math.min(#data, 18000) do
-		local particlePos = data[i]
-		--if (particlePos-EyePos()):GetNormalized():Dot(EyeVector()) < 0.75 then continue end
-		--render.DrawSprite(particlePos, GWATER_RADIUS, GWATER_RADIUS, Color( 255, 255, 255 ) )
-		render.DrawSphere(particlePos, GWATER_RADIUS / 1.5, 4, 3, Color( 255, 255, 255 ) )
 	end
 
 end)
 
+--update props
+timer.Create("GWATER_ADD_PROP", 1, 0, function()
+	local props = ents.GetAll()
+	for i = 1, #props do
+		local prop = props[i]
+		if prop.GWATER_UPLOADED then 
+			--local p = prop:GetPhysicsObject()
+			--p:EnableMotion(false)
+			--p:SetPos(prop:GetPos()) 
+			--p:SetAngles(prop:GetAngles()) 
+			continue 
+		end
+		if prop:GetClass() == "prop_physics" then
+			if !addPropMesh(prop) then return end
+			table.insert(meshes, prop)
+			prop.GWATER_UPLOADED = true
+			prop.LASTPOS = prop:GetPos()
+		end
 
-hook.Add( "HUDPaint", "Particles", function() 
+	end
+
+
+end)
+
+--draw particles
+hook.Add("PostDrawOpaqueRenderables", "GWATER_RENDER", function()
+	data, particleCount = gwater.GetData()
+	render.SetMaterial(GWATER_MAT)
+	render.DrawSprite(Vector(0, 0, 0), 100, 100, Color( 255, 255, 255 ) )
+
+	for i=1, math.min(#data, 18000) do
+		local particlePos = data[i]
+		--if (particlePos-EyePos()):GetNormalized():Dot(EyeVector()) < 0.75 then continue end
+		render.DrawSprite(particlePos, gwaterRadius, gwaterRadius, Color(0, 0, 255))
+		--render.DrawSphere(particlePos, GWATER_RADIUS / 1.5, 3, 3)
+		--render.DrawBox(particlePos, Angle(0, 0, 0), Vector(-5), Vector(5))
+	end
+
+end)
+
+--particle count
+hook.Add( "HUDPaint", "GWATER_SCORE", function() 
 	draw.DrawText(tostring(particleCount), "TargetID", ScrW() * 0.99, ScrH() * 0.01, color_white, TEXT_ALIGN_RIGHT )
+end )
+
+--chat commands
+hook.Add("OnPlayerChat", "GWATER_CHAT", function(ply, str) 
+    if (ply != LocalPlayer()) then return end
+	local str = string.lower(str)
+
+	local s = string.Split(str, " ")
+
+	if (s[1] == "-radius" ) then 
+		gwaterRadius = tonumber(s[2]) or 10
+		gwater.SetRadius(gwaterRadius) 
+	end
 end )
