@@ -22,16 +22,15 @@ struct Particle {
 struct Prop {
     NvFlexBuffer* verts;
     NvFlexBuffer* indices;
-    NvFlexTriangleMeshId meshID;
+    int meshID;
     
     float4 pos;
     float4 lastPos;
 
     float4 ang;
     float4 lastAng;
-
-    bool isConvex;
 };
+
 
 
 class flexAPI {
@@ -55,15 +54,17 @@ class flexAPI {
     NvFlexParams* flexParams;
     NvFlexSolverDesc flexSolverDesc;
 
-public:
     std::vector<Prop> props;
 
+public:
+
     void addParticle(Vector pos, Vector vel);
-    void calcMeshConcave(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen);
+    void addMeshConcave(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen);
     void flexSolveThread();
     void freeProp(int ID);
     void initParams(float r);
-    void calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen);
+    void addMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen);
+    void updateMeshPos(float4 pos, float4 ang, int id);
     flexAPI();
     ~flexAPI();
 

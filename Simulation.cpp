@@ -70,26 +70,26 @@ void flexAPI::flexSolveThread() {
 		//update positions of props
 		float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
 		float4* rotations = static_cast<float4*>(NvFlexMap(geoQuatBuffer, 0));
-
 		float4* prevPositions = static_cast<float4*>(NvFlexMap(geoPrevPosBuffer, 0));
 		float4* prevRotations = static_cast<float4*>(NvFlexMap(geoPrevQuatBuffer, 0));
-
+		
 		//start at 1 because world never moves
 		for (int i = 1; i < props.size(); i++) {
-			positions[i] = props[i].pos;
-			rotations[i] = props[i].ang;
+			Prop* prop = &props[i];
 
-			prevPositions[i] = props[i].lastPos;
-			prevRotations[i] = props[i].lastAng;
+			positions[i] = prop->pos;
+			rotations[i] = prop->ang;
 
-			props[i].pos = props[i].lastPos;
-			props[i].ang = props[i].lastAng;
+			prevPositions[i] = prop->lastPos;
+			prevRotations[i] = prop->lastAng;
+
+			prop->pos = prop->lastPos;
+			prop->ang = prop->lastAng;
 
 		}
 
 		NvFlexUnmap(geoPrevPosBuffer);
 		NvFlexUnmap(geoPrevQuatBuffer);
-
 		NvFlexUnmap(geoPosBuffer);
 		NvFlexUnmap(geoQuatBuffer);
 

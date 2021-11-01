@@ -23,25 +23,62 @@ void printLua(char* text)
 
 
 #define ADD_GWATER_FUNC(funcName, tblName) GlobalLUA->PushCFunction(funcName); GlobalLUA->SetField(-2, tblName);
+
+
+
+float dot(float3 a, float3 b) {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+float distance2(float4 a, float3 b) {
+	float x = b.x - a.x;
+	float y = b.y - a.y;
+	float z = b.z - a.z;
+
+	return (x * x + y * y + z * z);
+}
+
+float3 subtractFloat34(float4 a, float3 b) {
+	return float3{ a.x - b.x, a.y - b.y, a.z - b.z };
+}
+
 //returns particle xyz data
 LUA_FUNCTION(GetData) {
+
+	LUA->CheckType(-1, Type::Vector);
+	LUA->CheckType(-2, Type::Vector);
+
+	Vector gmodDir = LUA->GetVector();
+	float3 dir = float3{ gmodDir.x, gmodDir.y, gmodDir.z };
+
+	Vector gmodPos = LUA->GetVector(-2);
+	float3 pos = float3{ gmodPos.x, gmodPos.y, gmodPos.z };
+
+	LUA->Pop(2);
+
 	LUA->CreateTable();
 
 	//loop thru all particles & add to table (on stack)
+	int addedIndex = 0;
 	for (int i = 0; i < numParticles; i++) {
-		LUA->PushNumber(i + 1);
-
 		float4 thisPos = particleBufferHost[i];
+
+		if (dot(subtractFloat34(thisPos, pos), dir) < 0 || distance2(thisPos, pos) > 25000000) {
+			continue;
+		}
+
 		Vector gmodPos;
 		gmodPos.x = thisPos.x;
 		gmodPos.y = thisPos.y;
 		gmodPos.z = thisPos.z;
 
+		addedIndex++;
+		LUA->PushNumber(addedIndex);
 		LUA->PushVector(gmodPos);
 		LUA->SetTable(-3);
 	}
 
-	LUA->PushNumber(static_cast<double>(numParticles));
+	LUA->PushNumber(static_cast<double>(addedIndex));
 
 	return 2;
 }
@@ -83,7 +120,7 @@ LUA_FUNCTION(AddParticle) {
 }
 
 //the world mesh
-LUA_FUNCTION(AddMesh) {
+LUA_FUNCTION(AddConvexMesh) {
 
 	LUA->CheckType(-1, Type::Vector); // Max
 	LUA->CheckType(-2, Type::Vector); // Min
@@ -96,33 +133,71 @@ LUA_FUNCTION(AddMesh) {
 	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
 	LUA->Pop(2); //pop off min & max
 
+	//lock buffer
 	bufferMutex->lock();
-	//add data to PROP & generate mesh
+
 	size_t len = LUA->ObjLen();
 
 	//check to make sure the mesh is even valid (error models)
 	if (len < 1 || len % 3 != 0) {
 		bufferMutex->unlock();
-		printLua("[GWATER]: Invalid mesh given!!");
+		printLua("[GWATER]: Invalid mesh given");
 		LUA->PushBool(false);
-
 		return 1;
 	}
 
-	if (len / 3 < 64) {
-		flexLib->calcMeshConvex(LUA, minFloat, maxFloat, LUA->ObjLen());
+	if (len / 3 <= 64) {
+		flexLib->addMeshConvex(LUA, minFloat, maxFloat, LUA->ObjLen());
 		printLua("[GWATER]: Added convex mesh " + std::to_string(propCount));
 	}
 	else {
-		flexLib->calcMeshConcave(LUA, minFloat, maxFloat, LUA->ObjLen());
-
-		printLua("[GWATER]: Added concave mesh " + std::to_string(propCount));
+		flexLib->addMeshConcave(LUA, minFloat, maxFloat, LUA->ObjLen());
+		printLua("[GWATER]: Too many tris for mesh " + std::to_string(propCount) + ", adding as concave mesh!");
 	}
-	
+
 	bufferMutex->unlock();
 
 	//other
-	propCount += 1;
+	LUA->PushBool(true);
+
+	return 1;
+
+}
+
+
+LUA_FUNCTION(AddConcaveMesh) {
+
+	LUA->CheckType(-1, Type::Vector); // Max
+	LUA->CheckType(-2, Type::Vector); // Min
+	LUA->CheckType(-3, Type::Table);  // Sorted verts
+
+	//obbminmax
+	Vector maxV = LUA->GetVector();
+	Vector minV = LUA->GetVector(-2);
+	float minFloat[3] = { minV.x, minV.y, minV.z };
+	float maxFloat[3] = { maxV.x, maxV.y, maxV.z };
+	LUA->Pop(2); //pop off min & max
+
+	//lock buffer
+	bufferMutex->lock();
+
+	size_t len = LUA->ObjLen();
+
+	//check to make sure the mesh is even valid (error models)
+	if (len < 1 || len % 3 != 0) {
+		bufferMutex->unlock();
+		printLua("[GWATER]: Invalid mesh given");
+		LUA->PushBool(false);
+		return 1;
+	}
+
+	flexLib->addMeshConcave(LUA, minFloat, maxFloat, LUA->ObjLen());
+	printLua("[GWATER]: Added concave mesh " + std::to_string(propCount));
+
+
+	bufferMutex->unlock();
+
+	//other
 	LUA->PushBool(true);
 
 	return 1;
@@ -142,8 +217,7 @@ LUA_FUNCTION(SetMeshPos) {
 	Vector gmodAng = LUA->GetVector(-3);
 	float gmodAngW = static_cast<float>(LUA->GetNumber(-4));
 
-	flexLib->props[id].lastPos = float4{ gmodPos.x, gmodPos.y, gmodPos.z, 1.f / 50000.f };
-	flexLib->props[id].lastAng = float4{ gmodAng.x, gmodAng.y, gmodAng.z, gmodAngW };
+	flexLib->updateMeshPos(float4{ gmodPos.x, gmodPos.y, gmodPos.z, 1.f / 50000.f }, float4{ gmodAng.x, gmodAng.y, gmodAng.z, gmodAngW }, id);
 
 	LUA->Pop(4);	//pop id, pos, ang and angw
 	return 0;
@@ -159,7 +233,6 @@ LUA_FUNCTION(RemoveMesh) {
 	bufferMutex->lock();
 
 	flexLib->freeProp(id);
-	propCount--;
 
 	bufferMutex->unlock();
 
@@ -180,7 +253,8 @@ GMOD_MODULE_OPEN()
 	LUA->CreateTable();
 	ADD_GWATER_FUNC(GetData, "GetData");
 	ADD_GWATER_FUNC(DeleteSimulation, "DeleteSimulation");
-	ADD_GWATER_FUNC(AddMesh, "AddMesh");
+	ADD_GWATER_FUNC(AddConvexMesh, "AddConvexMesh");
+	ADD_GWATER_FUNC(AddConcaveMesh, "AddConcaveMesh");
 	ADD_GWATER_FUNC(AddParticle, "SpawnParticle");
 	ADD_GWATER_FUNC(RemoveAllParticles, "RemoveAll");
 	ADD_GWATER_FUNC(SetMeshPos, "SetMeshPos");

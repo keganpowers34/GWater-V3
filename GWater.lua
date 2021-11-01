@@ -7,17 +7,6 @@ local meshes = {}
 local data, particleCount
 local gwaterRadius = 10
 
--- DEPTH BUFFER ACCESS --
- 
-hook.Add("NeedsDepthPass", "depth_render", function() -- This hook is required to render depth buffers to access them
-    return true -- Render depth buffers
-end)
- 
-local depthMat = CreateMaterial("depdtddsbuf_mat", "UnlitGeneric", {}) -- This creates a material to hold the depth buffer we will receive
-local depthTexture = render.GetResolvedFullFrameDepth() -- This acquires the ITexture object that holds the depth buffer data in pixels
- 
-depthMat:SetTexture("$basetexture", depthTexture) -- This sets the material's texture to the depth buffer texture
-
 local function quatUnpack(q)
 	return q[1], q[2], q[3], q[4]
 end
@@ -75,39 +64,48 @@ end
 --potatofunc
 local function addPropMesh(prop)
     local model = prop:GetModel()
-	if !util.GetModelMeshes(model) then print("[GWATER]: INVALID MESH!") return end
+	if !util.GetModelMeshes(model) then prop.GWATER_UPLOADED = true return end
 
-    local pos = prop:GetPos()
-
-    local chonker_mesh = {}
-
-
-	
-
-	--vismesh
-    --for _, mesh in pairs( util.GetModelMeshes(model) ) do -- combine all model meshes into the chonker mesh
-    --    for _, tri in pairs( mesh.triangles ) do
-    --        table.insert( chonker_mesh, tri.pos )
-    --    end
-    --end
-	
-
-	--physmesh
 	prop:PhysicsInit(6)	--SOLID_VPHYSICS
-	for _, tri in pairs( prop:GetPhysicsObject():GetMesh() ) do 
-        table.insert( chonker_mesh, tri.pos )
-    end
+
+	if(#prop:GetPhysicsObject():GetMeshConvexes() < 8) then
+
+		--physmesh
+		for _, convex in pairs( prop:GetPhysicsObject():GetMeshConvexes() ) do 
+			local chonker_mesh = {}
+			for _, tri in pairs(convex) do 
+				table.insert( chonker_mesh, tri.pos )
+			end
+
+			gwater.AddConvexMesh(chonker_mesh, prop:OBBMins() - Vector(10, 10, 10), prop:OBBMaxs() + Vector(10, 10, 10))
+			table.insert(meshes, prop)
+		end
+
+	else 
+
+		local chonker_mesh = {}
+		--vismesh
+		for _, mesh in pairs( util.GetModelMeshes(model) ) do -- combine all model meshes into the chonker mesh
+			for _, tri in pairs( mesh.triangles ) do
+				table.insert( chonker_mesh, tri.pos )
+			end
+		end
+
+		gwater.AddConcaveMesh(chonker_mesh, prop:OBBMins() - Vector(10, 10, 10), prop:OBBMaxs() + Vector(10, 10, 10))
+		table.insert(meshes, prop)
+	end
+
 	prop:PhysicsDestroy()	--just removes physmesh
 
-    return gwater.AddMesh(chonker_mesh, prop:OBBMins() * 2, prop:OBBMaxs() * 2)
-
+	prop.GWATER_UPLOADED = true
+	prop.GWATER_LASTPOS = Vector()
 end
 
 if(!_G.gwater)then
 	require("GWater_Rewrite")
 
 	--world mesh--
-	gwater.AddMesh(triangulateWorld(), Vector(-33000, -33000, -33000), Vector(33000, 33000, 33000))
+	gwater.AddConcaveMesh(triangulateWorld(), Vector(-33000, -33000, -33000), Vector(33000, 33000, 33000))
 end
 
 --material
@@ -115,7 +113,7 @@ GWATER_MAT = Material("effects/circle2")		--phoenix_storms/blue_steel
 
 --update particles
 hook.Add("Think", "GWATER_PARTICLE_UPDATE", function()
-	if(!lp or !lp:IsValid()) then return end
+	if(!lp or !lp:IsValid() or not gwater) then return end
 	if(lp:Alive() and lp:GetActiveWeapon():GetClass() == "weapon_crowbar") then
 		--attack1
 		if lp:KeyDown(1) then
@@ -136,17 +134,19 @@ hook.Add("Think", "GWATER_PARTICLE_UPDATE", function()
 	end
 
 	for i, mesh in ipairs(meshes) do
-			if !mesh:IsValid() then 
-				print("[GWATER]: Removing mesh " .. i)
-				gwater.RemoveMesh(i)
-				table.remove(meshes, i)
-				break
-			end
+		if !mesh:IsValid() then 
+			print("[GWATER]: Removing mesh " .. i)
+			gwater.RemoveMesh(i)
+			table.remove(meshes, i)
+			break
+		end
 
-			local newQuat = unfuckQuat( quatFromAngle( mesh:GetAngles() ) )
-			gwater.SetMeshPos(newQuat[4], Vector(newQuat[1], newQuat[2], newQuat[3]), mesh:GetPos(), i);
+		if mesh.GWATER_LASTPOS == mesh:GetPos() then continue end
 
-			--mesh.LASTPOS = mesh.LASTPOS + (mesh:GetPos() - mesh.LASTPOS):GetNormalized()
+		local newQuat = unfuckQuat( quatFromAngle( mesh:GetAngles() ) )
+		gwater.SetMeshPos(newQuat[4], Vector(newQuat[1], newQuat[2], newQuat[3]), mesh:GetPos(), i);
+
+		--mesh.LASTPOS = mesh.LASTPOS + (mesh:GetPos() - mesh.LASTPOS):GetNormalized()
 
 	end
 
@@ -158,17 +158,10 @@ timer.Create("GWATER_ADD_PROP", 1, 0, function()
 	for i = 1, #props do
 		local prop = props[i]
 		if prop.GWATER_UPLOADED then 
-			--local p = prop:GetPhysicsObject()
-			--p:EnableMotion(false)
-			--p:SetPos(prop:GetPos()) 
-			--p:SetAngles(prop:GetAngles()) 
 			continue 
 		end
 		if prop:GetClass() == "prop_physics" then
-			if !addPropMesh(prop) then return end
-			table.insert(meshes, prop)
-			prop.GWATER_UPLOADED = true
-			prop.LASTPOS = prop:GetPos()
+			addPropMesh(prop) 
 		end
 
 	end
@@ -176,20 +169,26 @@ timer.Create("GWATER_ADD_PROP", 1, 0, function()
 
 end)
 
+local WATER_COLOR = Color(0, 0, 255)
+local MAX_RANGE = 500 -- Range for gwater particles to be rendered
+MAX_RANGE = MAX_RANGE * MAX_RANGE
+ 
 --draw particles
 hook.Add("PostDrawOpaqueRenderables", "GWATER_RENDER", function()
-	data, particleCount = gwater.GetData()
+	data, particleCount = gwater.GetData(lp:EyePos(), lp:EyeAngles():Forward())
 	render.SetMaterial(GWATER_MAT)
 	render.DrawSprite(Vector(0, 0, 0), 100, 100, Color( 255, 255, 255 ) )
-
-	for i=1, math.min(#data, 18000) do
-		local particlePos = data[i]
+ 
+	for i=1, math.min(particleCount, 18000) do
+		--local particlePos = data[i]
 		--if (particlePos-EyePos()):GetNormalized():Dot(EyeVector()) < 0.75 then continue end
-		render.DrawSprite(particlePos, gwaterRadius, gwaterRadius, Color(0, 0, 255))
+ 
+		--if (particlePos:DistToSqr(EyePos()) > MAX_RANGE) then continue end
+		render.DrawSprite(data[i], gwaterRadius, gwaterRadius, WATER_COLOR)
 		--render.DrawSphere(particlePos, GWATER_RADIUS / 1.5, 3, 3)
 		--render.DrawBox(particlePos, Angle(0, 0, 0), Vector(-5), Vector(5))
 	end
-
+ 
 end)
 
 --particle count

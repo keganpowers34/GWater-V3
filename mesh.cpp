@@ -16,17 +16,16 @@ float3 normalize(const float3& v)
     return float3{ v.x / length_of_v, v.y / length_of_v, v.z / length_of_v };
 }
 
-//generate a CONVEX mesh for flex
-void flexAPI::calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen) {
+//adds convex mesh for flex
+void flexAPI::addMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen) {
     //prop declerations
     Prop p = Prop{};
     p.pos = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
     p.ang = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
     p.lastPos = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
     p.lastAng = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
-    p.isConvex = true;
-
     p.verts = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(float4), eNvFlexBufferHost);
+
     float4* hostVerts = static_cast<float4*>(NvFlexMap(p.verts, eNvFlexMapWait));
 
     //loop through verticies
@@ -57,10 +56,7 @@ void flexAPI::calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloa
         float d = cross.x * verts[0].x + cross.y * verts[0].y + cross.z * verts[0].z;
 
         //array of plane data
-        hostVerts[i / 3] = float4{ cross.x, cross.y, -cross.z, d };
-
-        //debug
-        //printLua(std::to_string(hostVerts[i / 3].x) + ", " + std::to_string(hostVerts[i / 3].y) + ", " + std::to_string(hostVerts[i / 3].z) + ", " + std::to_string(hostVerts[i / 3].w));
+        hostVerts[i / 3] = float4{ -cross.x, -cross.y, -cross.z, d };
     }
 
     LUA->Pop(); //pop table
@@ -78,6 +74,7 @@ void flexAPI::calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloa
     float4* prevRotations = static_cast<float4*>(NvFlexMap(geoPrevQuatBuffer, 0));
     int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
     flags[propCount] = NvFlexMakeShapeFlags(eNvFlexShapeConvexMesh, true);	//always dynamic (props)
+
         geometry[propCount].convexMesh.mesh = p.meshID;
         geometry[propCount].convexMesh.scale[0] = 1.0f;
         geometry[propCount].convexMesh.scale[1] = 1.0f;
@@ -86,6 +83,7 @@ void flexAPI::calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloa
         rotations[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.01f };	//NEVER SET ROTATION TO 0,0,0,0, FLEX *HATES* IT!
         prevPositions[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
         prevRotations[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
+
     NvFlexUnmap(geometryBuffer);
     NvFlexUnmap(geoPosBuffer);
     NvFlexUnmap(geoQuatBuffer);
@@ -94,6 +92,7 @@ void flexAPI::calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloa
     NvFlexUnmap(geoFlagsBuffer);
 
     props.push_back(p);
+    propCount++;
 
 }
 
@@ -101,16 +100,16 @@ void flexAPI::calcMeshConvex(GarrysMod::Lua::ILuaBase* LUA, const float* minFloa
 
 
 
+
+
 //generate a TRIANGLE mesh for flex
-void flexAPI::calcMeshConcave(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen) {
+void flexAPI::addMeshConcave(GarrysMod::Lua::ILuaBase* LUA, const float* minFloat, const float* maxFloat, size_t tableLen) {
     //prop declerations
     Prop p = Prop{};
     p.pos = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
     p.ang = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
     p.lastPos = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
     p.lastAng = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
-    p.isConvex = false;
-
     p.verts = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(float4), eNvFlexBufferHost);
     p.indices = NvFlexAllocBuffer(flexLibrary, tableLen, sizeof(int), eNvFlexBufferHost);
 
@@ -160,6 +159,7 @@ void flexAPI::calcMeshConcave(GarrysMod::Lua::ILuaBase* LUA, const float* minFlo
     float4* prevRotations = static_cast<float4*>(NvFlexMap(geoPrevQuatBuffer, 0));
     int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
     flags[propCount] = NvFlexMakeShapeFlags(eNvFlexShapeTriangleMesh, propCount != 0);	//index 0 is ALWAYS the world
+
         geometry[propCount].triMesh.mesh = p.meshID;
         geometry[propCount].triMesh.scale[0] = 1.0f;
         geometry[propCount].triMesh.scale[1] = 1.0f;
@@ -168,6 +168,7 @@ void flexAPI::calcMeshConcave(GarrysMod::Lua::ILuaBase* LUA, const float* minFlo
         rotations[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.01f };	//NEVER SET ROTATION TO 0,0,0,0, FLEX *HATES* IT!
         prevPositions[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.0f };
         prevRotations[propCount] = float4{ 0.0f, 0.0f, 0.0f, 0.01f };
+
     NvFlexUnmap(geometryBuffer);
     NvFlexUnmap(geoPosBuffer);
     NvFlexUnmap(geoQuatBuffer);
@@ -176,5 +177,6 @@ void flexAPI::calcMeshConcave(GarrysMod::Lua::ILuaBase* LUA, const float* minFlo
     NvFlexUnmap(geoFlagsBuffer);
 
     props.push_back(p);
+    propCount++;
 
 }

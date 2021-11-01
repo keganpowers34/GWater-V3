@@ -18,18 +18,27 @@ void flexAPI::addParticle(Vector pos, Vector vel) {
 
 }
 
-void flexAPI::freeProp(int ID) {
+//updates position of mesh `id`
+void flexAPI::updateMeshPos(float4 pos, float4 ang, int id) {
+    //int add = props[id].convexCount;
+    //for (int i = 0; i <= add; i++) {
+        props[id].lastPos = pos;
+        props[id].lastAng = ang;
+    //}
+}
 
-    Prop* prop = &props[ID];
+void flexAPI::freeProp(int id) {
+    Prop* prop = &props[id];
 
     NvFlexFreeBuffer(prop->verts);
-    if (prop->isConvex) {
-        NvFlexDestroyConvexMesh(flexLibrary, prop->meshID);
+    if (prop->indices == nullptr) {
+        NvFlexDestroyConvexMesh(flexLibrary, prop->meshID);      //must be convex
     }
     else {
         NvFlexFreeBuffer(prop->indices);
-        NvFlexDestroyTriangleMesh(flexLibrary, prop->meshID);
+        NvFlexDestroyTriangleMesh(flexLibrary, prop->meshID);    //must be triangle mesh
     }
+
 
     NvFlexCollisionGeometry* geometry = static_cast<NvFlexCollisionGeometry*>(NvFlexMap(geometryBuffer, 0));
     float4* positions = static_cast<float4*>(NvFlexMap(geoPosBuffer, 0));
@@ -37,7 +46,8 @@ void flexAPI::freeProp(int ID) {
     float4* prevPositions = static_cast<float4*>(NvFlexMap(geoPrevPosBuffer, 0));
     float4* prevRotations = static_cast<float4*>(NvFlexMap(geoPrevQuatBuffer, 0));
     int* flags = static_cast<int*>(NvFlexMap(geoFlagsBuffer, 0));
-        for (int i = ID; i < propCount; i++) {
+
+        for (int i = id; i < propCount; i++) {
             int nextIndex = i + 1;
 
             geometry[i] = geometry[nextIndex];
@@ -49,6 +59,7 @@ void flexAPI::freeProp(int ID) {
 
             props[i] = props[nextIndex];
         }
+
     NvFlexUnmap(geometryBuffer);
     NvFlexUnmap(geoPosBuffer);
     NvFlexUnmap(geoQuatBuffer);
@@ -56,7 +67,10 @@ void flexAPI::freeProp(int ID) {
     NvFlexUnmap(geoPrevQuatBuffer);
     NvFlexUnmap(geoFlagsBuffer);
 
+
     props.pop_back();
+    propCount--;
+
 
 }
 
