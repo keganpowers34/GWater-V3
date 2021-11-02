@@ -47,16 +47,15 @@ LUA_FUNCTION(GetData) {
 
 	LUA->CheckType(-1, Type::Vector);
 	LUA->CheckType(-2, Type::Vector);
-
 	Vector gmodDir = LUA->GetVector();
 	float3 dir = float3{ gmodDir.x, gmodDir.y, gmodDir.z };
 
 	Vector gmodPos = LUA->GetVector(-2);
 	float3 pos = float3{ gmodPos.x, gmodPos.y, gmodPos.z };
-
 	LUA->Pop(2);
 
-	LUA->CreateTable();
+	LUA->PushSpecial(SPECIAL_GLOB);
+	LUA->GetField(-1, "render");
 
 	//loop thru all particles & add to table (on stack)
 	int addedIndex = 0;
@@ -72,15 +71,21 @@ LUA_FUNCTION(GetData) {
 		gmodPos.y = thisPos.y;
 		gmodPos.z = thisPos.z;
 
-		addedIndex++;
-		LUA->PushNumber(addedIndex);
+		LUA->GetField(-1, "DrawSprite");
 		LUA->PushVector(gmodPos);
-		LUA->SetTable(-3);
+		LUA->PushNumber(10);
+		LUA->PushNumber(10);
+		LUA->Call(3, 0);	//pops literally everything above except render and _G
+		//render.DrawSprite(data[i], gwaterRadius, gwaterRadius, WATER_COLOR)
+
+		addedIndex++;
 	}
 
-	LUA->PushNumber(static_cast<double>(addedIndex));
+	LUA->Pop(2); //pop _G and render?
 
-	return 2;
+	LUA->PushNumber(addedIndex);
+
+	return 1;
 }
 
 LUA_FUNCTION(RemoveAllParticles) {

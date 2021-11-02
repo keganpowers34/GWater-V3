@@ -48,7 +48,7 @@ void flexAPI::initParams(float r) {
 	flexParams->dissipation = 0.01f;
 	flexParams->damping = 0.0f;
 	flexParams->particleCollisionMargin = r * 0.5f;
-	flexParams->shapeCollisionMargin = r * 0.25f;
+	flexParams->shapeCollisionMargin = r * 0.1f;
 	flexParams->collisionDistance = r * 0.25f; // Needed for tri-particle intersection
 	flexParams->sleepThreshold = 0.1f;
 	flexParams->shockPropagation = 0.0f;
