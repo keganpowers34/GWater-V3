@@ -34,5 +34,3 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: gwater
-        path: gwater.dll
-        retention-days: 5
