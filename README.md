@@ -5,8 +5,8 @@ we're plseaed to have you here
 our code is cleaner than a lake  
   
 🗿
-Dependencies used:
 
+Dependencies used:
 https://github.com/Facepunch/gmod-module-base
 
 https://github.com/NVIDIAGameWorks/FleX
