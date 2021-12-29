@@ -35,6 +35,6 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: ${{env.SOLUTION_FILE_PATH}}.dll
-        path: ./${{env.SOLUTION_FILE_PATH}}.dll
+        path: ${{env.SOLUTION_FILE_PATH}}.dll
         if-no-files-found: error
 
