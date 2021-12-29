@@ -35,6 +35,6 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: gwater
-        path: Gwater\bin\Release
+        path: D:\a\GWater-V3\GWater-V3\Release\x64
         if-no-files-found: error
 
