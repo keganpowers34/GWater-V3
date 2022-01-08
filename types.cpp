@@ -447,4 +447,3 @@ FLEX_API::~FLEX_API() {
 
     delete bufferMutex;
 }
-

@@ -43,7 +43,52 @@ struct float3 {
     float3 operator/(float e) {
         return { x / e, y / e, z / e };
     }
+    float3 Cross(float3 e) {
+        return { y * e.z - z * e.y, z * e.x - x * e.z, x * e.y - y * e.x };
+    }
+    float3 Normalize() {
+        float len = sqrt(x * x + y * y + z * z);
+        return { x / len, y / len, z / len };
+    }
 };
+
+//Mat3 structure, holds 3 float3s
+struct mat3
+{
+    float3 column1;
+    float3 column2;
+    float3 column3;
+
+    mat3(float3 c1, float3 c2, float3 c3) : column1(c1), column2(c2), column3(c3) {};
+    mat3() : column1(float3(0, 0, 0)), column2(float3(0, 0, 0)), column3(float3(0, 0, 0)) {};
+    mat3(float l) : column1(float3(l, l, l)), column2(float3(l, l, l)), column3(float3(l, l, l)) {};
+    mat3(float4 c1, float4 c2, float4 c3) : column1(float3(c1.x, c1.y, c1.z)), column2(float3(c2.x, c2.y, c2.z)), column3(float3(c3.x, c3.y, c3.z)) {};
+    mat3(float3 lookingDirection){
+
+        float3 up = float3(0, 0, 1);
+        float3 right = lookingDirection.Cross(up);
+        up = right.Cross(lookingDirection);
+
+        column1 = right.Normalize();
+        column2 = up.Normalize();
+        column3 = lookingDirection.Normalize();
+
+    }
+
+    mat3 Transpose() {
+        column1 = float3(column1.x, column2.x, column3.x);
+        column2 = float3(column1.y, column2.y, column3.y);
+        column3 = float3(column1.z, column2.z, column3.z);
+    }
+
+    float3 operator*(float3 e) {
+        return { column1.x * e.x + column2.x * e.y + column3.x * e.z,
+                 column1.y * e.x + column2.y * e.y + column3.y * e.z,
+                 column1.z * e.x + column2.z * e.y + column3.z * e.z };
+    }
+
+    
+}
 
 struct Particle {
     float4 pos;

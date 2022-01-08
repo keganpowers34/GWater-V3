@@ -1,5 +1,6 @@
 #include "declarations.h"
 #include "util.h"
+#include "types.h"
 #include <string>
 #include "GarrysMod/Lua/LuaBase.h"
 
@@ -53,13 +54,32 @@ LUA_FUNCTION(RenderParticles)
 	LUA->PushSpecial(SPECIAL_GLOB);
 	LUA->GetField(-1, "render");
 
+	mat3 Rotation = new mat3(dir)->Transpose();
+
 	float particleRadius = FLEX_Simulation->radius;
+
+	// Create grid for storing depth
+	bool grid[128, 64];
 
 	//loop thru all particles, any that we cannot see are not rendered
 	for (int i = 0; i < ParticleCount; i++) {
 		float3 thisPos = float3(particleBufferHost[i]);
+		float3 localPosition = (float3(particleBufferHost) - pos) * Rotation;
 
-		if (Dot(thisPos - pos, dir) < 0 || DistanceSquared(thisPos, pos) > RenderDistance) continue;
+		//calculate distance from camera
+		float dist = localPosition.x;
+
+		//Get 2d Position
+		int x = (int)(localPosition.y / dist);
+		int y = (int)(localPosition.z / dist);
+
+		//Get the grid position
+		int gridX = x + 64;
+		int gridY = y + 32;
+
+		if (Dot(thisPos - pos, dir) < 0 || dist > RenderDistance || grid[gridX, gridY]) continue;
+
+		grid[gridX, gridY] = true;
 
 		Vector gmodPos;
 		gmodPos.x = thisPos.x;
