@@ -6,8 +6,7 @@ hook.Add("GWaterInitialized", "GWater.Startup", function()
     local isSwimming = false
     local time = 0
 
-    --mee: lagspikes every 5 seconds, talk to me about this if you want to reenable plz :)
-    --a: this barely lags wtf do you mean
+    --mee: this stresses the CRAP out of the gpu!!!
     --timer.Create("GWATER_CLEAN_LOST_PARTICLES", 5, 0, function()
     --    gwater.CleanLostParticles()
     --end)
@@ -23,6 +22,7 @@ hook.Add("GWaterInitialized", "GWater.Startup", function()
                 isSwimming = true
                 net.Start("GWATER_SWIMMING")
                     net.WriteBool(true)
+                    net.WriteFloat(1)
                 net.SendToServer()
                 LocalPlayer():EmitSound("Physics.WaterSplash")
             end
@@ -30,6 +30,7 @@ hook.Add("GWaterInitialized", "GWater.Startup", function()
             isSwimming = false
             net.Start("GWATER_SWIMMING")
                 net.WriteBool(false)
+                net.WriteFloat(1)
             net.SendToServer()
             LocalPlayer():EmitSound("Physics.WaterSplash")
         end
