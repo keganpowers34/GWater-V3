@@ -22,8 +22,8 @@ If you're having trouble, ask us in [the server we developed GWater in](https://
 Please note that this addon is still in beta.  
 It *will* have bugs and issues, but we're working to fix them and make the experience better for you!  
 
-  
-  
+
+
   
   
   
