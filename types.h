@@ -43,6 +43,12 @@ struct float3 {
     float3 operator/(float e) {
         return { x / e, y / e, z / e };
     }
+    bool operator==(float3 e) {
+        return (x == e.x && y == e.y && z == e.z);
+    }
+    bool operator!=(float3 e) {
+        return (x != e.x || y != e.y || z != e.z);
+    }
 };
 
 struct Particle {
@@ -67,12 +73,14 @@ struct SimBuffers {
     float3* velocities;
     int* phases;
     int* activeIndices;
+
     NvFlexCollisionGeometry* geometry;
     float4* positions;
     float4* rotations;
     float4* prevPositions;
     float4* prevRotations;
     int* flags;
+
     int* indices;
     float* lengths;
     float* coefficients;
@@ -83,7 +91,6 @@ struct ForceFieldData {
     NvFlexExtForceField* forceFieldBuffer;
     int forceFieldCount;
 };
-
 
 class FLEX_API {
     NvFlexLibrary* flexLibrary;
@@ -106,48 +113,65 @@ class FLEX_API {
     NvFlexBuffer* lengthsBuffer;
     NvFlexBuffer* coefficientsBuffer;
 
+    NvFlexBuffer* diffusePosBuffer;
+    NvFlexBuffer* diffuseSingleBuffer;
+
     ForceFieldData* forceFieldData;
 
     std::vector<Prop> props;
     std::vector<Particle> particleQueue;
 
+    int springCount = 0;
+    int rigidSpringCount = 0;
+    int rigidCoeffCount = 0;
+
 public:
     std::map<std::string, float*> flexMap;
-    std::map<std::string, float> gwaterMap;
     NvFlexParams* flexParams;
     NvFlexSolverDesc flexSolverDesc;
-
+    std::vector<std::vector<int>> triangles;
+    std::vector<Vector> particleColors;
     float radius;
 
-    void addParticle(Vector pos, Vector vel);
+    void addParticle(Vector pos, Vector vel, Vector color);
     void addMeshConcave(GarrysMod::Lua::ILuaBase* LUA);
     void addMeshConvex(GarrysMod::Lua::ILuaBase* LUA);
+    void addMeshCapsule(GarrysMod::Lua::ILuaBase* LUA);
+    void addCloth(float3 pos, int width, float radius, float stiffness, float mass);
+    void addRigidbody(float3 lower, int dimx, int dimy, int dimz, float radius, float3 velocity, float mass, bool constraints);
     void updateMeshPos(Vector pos, QAngle ang, int id);
     void freeProp(int ID);
 
     void updateParam(std::string, float n);
-    void updateExtraParam(std::string str, float n);
     void initParams();
     void initParamsRadius(float r);
     void flexSolveThread();
     void removeAllParticles();
     void removeAllProps();
-    void removeInRadius(float3 pos, float radius);
+    int removeInRadius(float3 pos, float radius);
+    void removeAllCloth();
 
+    void SetParticleLimit(int limit);
     void cullParticles();
     void cleanLostParticles();
     int cleanLoneParticles();
-    //int recalculateSimulatedParticles(float3 eyepos); // returns how many particles are simulated
 
     void applyForce(float3 pos, float3 vel, float radius, bool linear);
+    void applyForceRange(float3 pos, float3 vel, float radius, bool linear, std::vector<int> range);
     void applyForceOutwards(float3 pos, float strength, float radius, bool linear);
+    void applyForceOutwardsRange(float3 pos, float strength, float radius, bool linear, std::vector<int> range);
 
-    //void addCloth(GarrysMod::Lua::ILuaBase* LUA, size_t tableLen);
+    // springs (flex provided functions)
+    void CreateSpringGrid(float3 lower, int dx, int dy, float radius, int phase, float stretchStiffness, float mass);
+    void CreateParticleGrid(float3 lower, int dimx, int dimy, int dimz, float radius, float3 velocity, float mass, int phase, bool constraints);
+    void CreateSpring(int i, int j, float stiffness, float give = 0.0f);
 
     void addForceField(Vector pos, float radius, float strength, bool linear, int type);
     void deleteForceField(int ID);
     void setForceFieldPos(int ID, Vector pos);
     void editForceField(int ID, float radius, float strength, bool linear, int type);
+
+    float editParticle(int ID, float3 pos, float3 vel, float mass);
 
     void mapBuffers();
     void unmapBuffers();

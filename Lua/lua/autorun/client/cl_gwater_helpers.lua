@@ -1,6 +1,6 @@
 -- by andrew
 
-hook.Add("GWaterInitialize", "GWater.Helpers", function()
+hook.Add("GWaterInitialized", "GWater.Helpers", function()
 	function gwater.AddClass(class)
 		if gwater.Whitelist then gwater.Whitelist[class] = true end
 	end
@@ -10,12 +10,10 @@ hook.Add("GWaterInitialize", "GWater.Helpers", function()
 	end
 	
 	function gwater.GetLuaVersion()
-		return 1
+		return 1.4
 	end
 	
 	function gwater.GetModuleVersionForLua()
-		return 1 -- change this when needed
+		return 1.4 -- change this when needed
 	end
-	
-	print("[GWATER]: Loaded helpers file!")
 end)

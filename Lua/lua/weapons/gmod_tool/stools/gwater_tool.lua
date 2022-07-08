@@ -42,8 +42,13 @@ function TOOL:LeftClick(trace)
 	if CLIENT then
 		net.Start("GWATER_REMOVE")
 			net.WriteVector(trace.HitPos)
-			net.WriteInt(self.DisplaySize * self.DisplaySize, 16)
+			net.WriteInt(self.DisplaySize or 500, 16)
 		net.SendToServer()
+	elseif game.SinglePlayer() then
+		net.Start("GWATER_REMOVE")
+			net.WriteVector(trace.HitPos)
+			net.WriteInt(self.DisplaySize or 500, 16)
+		net.Broadcast()
 	end
 
 	return true

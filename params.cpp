@@ -5,7 +5,7 @@
 #include "declarations.h"
 #include <float.h>
 
-
+float simFPS = 60.f;
 void FLEX_API::initParams() {
 	flexParams->gravity[0] = 0.0f;
 	flexParams->gravity[1] = 0.0f;
@@ -17,8 +17,8 @@ void FLEX_API::initParams() {
 
 	flexParams->radius = 0.f;
 	flexParams->viscosity = 0.0f;
-	flexParams->dynamicFriction = 0.5f;	//5/r
-	flexParams->staticFriction = 0.5f;
+	flexParams->dynamicFriction = 0.25f;	//5/r
+	flexParams->staticFriction = 0.25f;
 	flexParams->particleFriction = 0.01f; // scale friction between particles by default
 	flexParams->freeSurfaceDrag = 0.0f;
 	flexParams->drag = 0.0f;
@@ -37,7 +37,7 @@ void FLEX_API::initParams() {
 	flexParams->particleCollisionMargin = 0.f;
 	flexParams->shapeCollisionMargin = 0.f;
 	flexParams->collisionDistance = 0.f; // Needed for tri-particle intersection
-	flexParams->sleepThreshold = 1.f;
+	flexParams->sleepThreshold = 0.1f;
 	flexParams->shockPropagation = 0.0f;
 	flexParams->restitution = 1.0f;
 
@@ -45,17 +45,18 @@ void FLEX_API::initParams() {
 	flexParams->maxAcceleration = 128.0f;	// approximately 10x gravity
 	flexParams->relaxationMode = eNvFlexRelaxationLocal;
 	flexParams->relaxationFactor = 0.0f;
-	flexParams->solidPressure = 0.0f;
+	flexParams->solidPressure = 0.5f;
 	flexParams->adhesion = 0.0f;
 	flexParams->cohesion = 0.01f;
 	flexParams->surfaceTension = 0.0f;
 	flexParams->vorticityConfinement = 0.0f;
 	flexParams->buoyancy = 1.0f;
-	flexParams->diffuseThreshold = 0.0f;
-	flexParams->diffuseBuoyancy = 0.0f;
-	flexParams->diffuseDrag = 0.0f;
+
+	flexParams->diffuseThreshold = 3.f;
+	flexParams->diffuseBuoyancy = 1.f;
+	flexParams->diffuseDrag = 0.8;
 	flexParams->diffuseBallistic = 0;
-	flexParams->diffuseLifetime = 0.0f;
+	flexParams->diffuseLifetime = 30.0f;
 
 	// planes created after particles
 	flexParams->planes[0][0] = 0.f;
@@ -87,10 +88,7 @@ void FLEX_API::initParams() {
 	flexMap["staticFriction"] = &(flexParams->staticFriction);
 	flexMap["particleFriction"] = &(flexParams->particleFriction); // scale friction between particles by default
 
-	gwaterMap["simulationFramerate"] = 60;
-
-	//its an int
-	//flexMap["NUM_ITERATIONS"] = &(flexParams->numIterations);
+	flexMap["simFPS"] = &simFPS;
 }
 
 void FLEX_API::initParamsRadius(float r) {
@@ -110,15 +108,6 @@ void FLEX_API::updateParam(std::string str, float n) {
 	}
 	catch (std::exception e) {
 		GlobalLUA->ThrowError(("Invalid parameter \"" + str + "\"!").c_str());
-	}
-}
-
-void FLEX_API::updateExtraParam(std::string str, float n) {
-	try {
-		gwaterMap.at(str) = n;
-	}
-	catch (std::exception e) {
-		GlobalLUA->ThrowError(("Invalid extra parameter \"" + str + "\"!").c_str());
 	}
 }
 
